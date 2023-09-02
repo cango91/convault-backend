@@ -1,4 +1,6 @@
-import * as mongoose from 'mongoose';
+const mongoose = require('mongoose');
+const crypto = require('../../../utilities/crypto-service');
+
 
 function validateEmailPattern(val) {
     return /^[^@\s]+@[^@\s]+\.[^@\s]+$/gi.test(val);
@@ -53,5 +55,27 @@ const userSchema = new mongoose.Schema({
             }
         }
     });
+
+userSchema.pre('save', function (next) {
+    // 'this' is the user document
+    if (!this.isModified('password')) return next();
+    // Replace the password with the computed hash
+    try {
+        this.password = crypto.hashPassword(this.password);
+        return next();
+    } catch (error) {
+        console.log(error);
+        return next(error);
+    }
+});
+
+userSchema.methods.verifyPassword = function (password) {
+    try {
+        return crypto.compareHash(password, this.password);
+    } catch (error) {
+        console.log(error);
+        throw error;
+    }
+}
 
 module.exports = mongoose.model('User', userSchema);
