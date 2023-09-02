@@ -7,22 +7,22 @@ const HASH_DIGEST = process.env.HASH_DIGEST;
 
 const hashString = (password) => {
     const salt = crypto.randomBytes(HASH_SALT_LENGTH).toString('hex');
-    crypto.pbkdf2(password, salt, HASH_ITERS, HASH_KEY_LEN, HASH_DIGEST, (err, key) => {
+    return new Promise((resolve, reject) => crypto.pbkdf2(password, salt, HASH_ITERS, HASH_KEY_LEN, HASH_DIGEST, (err, key) => {
         if (err) {
-            throw err;
+            reject(err);
         }
-        return `${salt}:${key.toString('hex')}`;
-    });
+        resolve(`${salt}:${key.toString('hex')}`);
+    }));
 }
 
-const compareHash = (password, hash) =>{
+const compareHash = (password, hash) => {
     const [salt, key] = hash.split(':');
-    crypto.pbkdf2(password,salt,HASH_ITERS,HASH_KEY_LEN,HASH_DIGEST, (err,compKey) =>{
-        if(err){
-            throw err;
+    return new Promise((resolve,reject) => crypto.pbkdf2(password, salt, HASH_ITERS, HASH_KEY_LEN, HASH_DIGEST, (err, compKey) => {
+        if (err) {
+            reject(err);
         }
-        return key === compKey.toString('hex');
-    });
+        resolve(key === compKey.toString('hex'));
+    }));
 }
 
 module.exports = {

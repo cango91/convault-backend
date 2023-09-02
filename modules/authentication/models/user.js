@@ -56,12 +56,12 @@ const userSchema = new mongoose.Schema({
         }
     });
 
-userSchema.pre('save', function (next) {
+userSchema.pre('save', async function (next) {
     // 'this' is the user document
     if (!this.isModified('password')) return next();
     // Replace the password with the computed hash
     try {
-        this.password = crypto.hashString(this.password);
+        this.password = await crypto.hashString(this.password);
         return next();
     } catch (error) {
         console.log(error);
@@ -69,9 +69,9 @@ userSchema.pre('save', function (next) {
     }
 });
 
-userSchema.methods.verifyPassword = function (password) {
+userSchema.methods.verifyPassword = async function (password) {
     try {
-        return crypto.compareHash(password, this.password);
+        return await crypto.compareHash(password, this.password);
     } catch (error) {
         console.log(error);
         throw error;
