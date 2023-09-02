@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+// TODO: Investigate dependency injection for this use-case in Node/Express
 const crypto = require('../../../utilities/crypto-service');
 
 
@@ -71,7 +72,8 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.verifyPassword = async function (password) {
     try {
-        return await crypto.compareHash(password, this.password);
+        const verified = await crypto.compareHash(password, this.password);
+        return verified;
     } catch (error) {
         console.log(error);
         throw error;

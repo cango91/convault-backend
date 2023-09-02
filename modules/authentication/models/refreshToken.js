@@ -33,12 +33,17 @@ refreshToken.statics.deleteAllRevokedAndExpired = function () {
         { status: { $ne: 'valid' } }
     );
 }
-
+/** 
+ * Checks if a refreshToken for a given user is valid
+ * 
+ * Side effect: if the token has expired but status was valid, will modify db record
+*/
 refreshToken.statics.isValid = async function (user, token) {
     try {
         const storedToken = await this.findOne({ token });
         if (!storedToken)
             return false;
+        if(storedToken.status === 'revoked') return false;
         if (storedToken.expiresAt < new Date())
             await storedToken.expire();
         return storedToken.user.equals(user) && storedToken.status === 'valid';
