@@ -61,7 +61,7 @@ userSchema.pre('save', function (next) {
     if (!this.isModified('password')) return next();
     // Replace the password with the computed hash
     try {
-        this.password = crypto.hashPassword(this.password);
+        this.password = crypto.hashString(this.password);
         return next();
     } catch (error) {
         console.log(error);

@@ -5,7 +5,7 @@ const HASH_ITERS = Number(process.env.HASH_ITER_ROUNDS);
 const HASH_KEY_LEN = Number(process.env.HASH_KEY_LENGTH);
 const HASH_DIGEST = process.env.HASH_DIGEST;
 
-const hashPassword = (password) => {
+const hashString = (password) => {
     const salt = crypto.randomBytes(HASH_SALT_LENGTH).toString('hex');
     crypto.pbkdf2(password, salt, HASH_ITERS, HASH_KEY_LEN, HASH_DIGEST, (err, key) => {
         if (err) {
@@ -26,6 +26,6 @@ const compareHash = (password, hash) =>{
 }
 
 module.exports = {
-    hashPassword,
+    hashString,
     compareHash,
 }
