@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 // TODO: Investigate dependency injection for this use-case in Node/Express
-const crypto = require('../../../utilities/crypto-service');
+const crypt = require('../../../utilities/crypto-service');
 
 
 function validateEmailPattern(val) {
@@ -62,7 +62,7 @@ userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
     // Replace the password with the computed hash
     try {
-        this.password = await crypto.hashString(this.password);
+        this.password = await crypt.hashString(this.password);
         return next();
     } catch (error) {
         console.log(error);
@@ -72,7 +72,7 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.verifyPassword = async function (password) {
     try {
-        const verified = await crypto.compareHash(password, this.password);
+        const verified = await crypt.compareHash(password, this.password);
         return verified;
     } catch (error) {
         console.log(error);

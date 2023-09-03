@@ -4,8 +4,14 @@ const favicon = require('serve-favicon');
 const logger = require('morgan');
 const cookieParser = require('cookie-parser');
 const sanitize = require('express-mongo-sanitize');
-
 require('dotenv').config();
+
+
+const bearer = require('./middleware/bearer');
+const auth = require('./middleware/authenticate');
+const authRoutes = require('./modules/users/routes');
+
+require('./utilities/db');
 
 const DEBUG = process.env.NODE_ENV ? (['prod', 'production'].includes(process.env.NODE_ENV.toLowerCase())) : true;
 const PORT = process.env.PORT || 3001;
@@ -20,7 +26,10 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.use(sanitize());
 app.use(cookieParser());
 
+app.use(bearer);
+
 // API ROUTES
+app.use('/api/users',authRoutes);
 
 // "CATCH-ALL" ROUTE TO SERVE REACT-APP, MIGHT BE MIGRATED TO ANOTHER SERVER AND USE CORS
 app.get('/*', (req, res) => {

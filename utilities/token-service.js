@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const RefreshToken = require('../modules/authentication/models/refreshToken');
+const RefreshToken = require('../modules/users/models/refreshToken');
 const { toSeconds } = require('./utils');
 
 /**
@@ -92,6 +92,12 @@ async function refreshTokens(refreshToken) {
 
 }
 
+/**
+ * Checks if a jwt is valid. Returns decoded token if valid. Rejects promise with error if not.
+ * @param {String} token 
+ * @param {String} secret 
+ * @returns {Promise}
+ */
 function verifyJwt(token, secret = process.env.JWT_SECRET) {
     return new Promise((resolve, reject) => {
         jwt.verify(token, secret, (error, decodedToken) => {
@@ -104,6 +110,23 @@ function verifyJwt(token, secret = process.env.JWT_SECRET) {
     });
 }
 
+/**
+ * Conveneince function to set http(s)-only strict same side cookie with refreshToken
+ * 
+ * Setter must be res.cookie
+ * @param {Function} setter 
+ * @param {String} refreshToken 
+ */
+function setCookie(res, refreshToken) {
+    return res.cookie('refreshToken', refreshToken,
+        {
+            httpOnly: true,
+            sameSite: 'strict',
+            secure: process.env.NODE_ENV
+                && process.env.NODE_ENV.toLowerCase() === 'production'
+        });
+}
+
 
 
 module.exports = {
@@ -113,4 +136,5 @@ module.exports = {
     getUserFromToken,
     refreshTokens,
     verifyJwt,
+    setCookie,
 }

@@ -33,6 +33,11 @@ const toSeconds = (timeString) => {
     }
 }
 
+const respondWithStatus = (response, status = 400, message = 'Bad Request') =>
+    response.status(status).json({ message });
+
+
 module.exports = {
     toSeconds,
+    respondWithStatus,
 }
