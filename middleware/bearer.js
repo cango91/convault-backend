@@ -17,7 +17,7 @@ module.exports = async (req, res, next) => {
                         const tokens = await tokenService.refreshTokens(refreshToken);
                         req.user = tokenService.getUserFromToken(tokens.accessToken);
                         res.set('New-Access-Token', tokens.accessToken);
-                        tokenService.setCookie(res.cookie,tokens.refreshToken);
+                        tokenService.setCookie(res,tokens.refreshToken);
                         return next();
                     } catch (err) {
                         // Fall through to end, where req.user is already null.

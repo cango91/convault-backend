@@ -10,6 +10,8 @@ const refreshToken = new mongoose.Schema({
         required:true,
         default: 'valid'
     }
+},{
+    timestamps:true,
 });
 
 refreshToken.methods.revoke = function () {

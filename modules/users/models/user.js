@@ -70,9 +70,20 @@ userSchema.pre('save', async function (next) {
     }
 });
 
+userSchema.pre('save', async function (next) {
+    if (this.isNew || this.isModified('username')) {
+        const existingUser = await this.constructor.findOne({ username: new RegExp(`^${this.username}$`, 'i') });
+        if (existingUser && existingUser._id.toString() !== this._id.toString()) {
+            return next(new Error('Username already exists'));
+        } 
+    } 
+    return next();
+});
+
 userSchema.methods.verifyPassword = async function (password) {
     try {
         const verified = await crypt.compareHash(password, this.password);
+        console.log(verified);
         return verified;
     } catch (error) {
         console.log(error);

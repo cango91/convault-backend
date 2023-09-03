@@ -37,19 +37,24 @@ function createJwt(user, expiresIn) {
  * @returns {jwt}
  */
 async function createRefreshToken(user, expiresIn) {
-    const token = jwt.sign(
-        { user },
-        process.env.REFRESH_SECRET,
-        { expiresIn: expiresIn }
-    );
-    const refreshToken = new RefreshToken({
-        token,
-        user: user.id,
-        expiresAt: new Date(toSeconds(expiresIn) * 1000)
-    });
-
-    await refreshToken.save();
-    return token;
+try {
+        const token = jwt.sign(
+            { user },
+            process.env.REFRESH_SECRET,
+            { expiresIn: expiresIn }
+        );
+        const refreshToken = new RefreshToken({
+            token,
+            user: user.id,
+            expiresAt: new Date(toSeconds(expiresIn) * 1000)
+        });
+    
+        await refreshToken.save();
+        return token;
+} catch (error) {
+    console.log(error);
+    throw error;
+}
 }
 
 /**
@@ -75,6 +80,7 @@ async function refreshTokens(refreshToken) {
         await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
         const user = getUserFromToken(refreshToken);
         if (await RefreshToken.isValid(user, refreshToken)) {
+            await RefreshToken.updateOne({token:refreshToken},{status: 'revoked'});
             const newRefreshToken = await createRefreshToken(user, process.env.REFRESH_EXP);
             const newJwt = createJwt(user, process.env.JWT_EXP);
             return { accessToken: newJwt, refreshToken: newRefreshToken };
@@ -90,6 +96,16 @@ async function refreshTokens(refreshToken) {
         throw error;
     }
 
+}
+
+async function revokeRefreshToken(refreshToken){
+    try {
+        await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
+        await RefreshToken.updateOne({token:refreshToken}, {status: 'revoked'});
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
 }
 
 /**
@@ -137,4 +153,5 @@ module.exports = {
     refreshTokens,
     verifyJwt,
     setCookie,
+    revokeRefreshToken,
 }
