@@ -65,7 +65,7 @@ userSchema.pre('save', async function (next) {
         this.password = await crypt.hashString(this.password);
         return next();
     } catch (error) {
-        console.log(error);
+        console.error(error);
         return next(error);
     }
 });
@@ -83,10 +83,9 @@ userSchema.pre('save', async function (next) {
 userSchema.methods.verifyPassword = async function (password) {
     try {
         const verified = await crypt.compareHash(password, this.password);
-        console.log(verified);
         return verified;
     } catch (error) {
-        console.log(error);
+        console.error(error);
         throw error;
     }
 }

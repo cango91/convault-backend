@@ -30,6 +30,9 @@ app.use(bearer);
 
 // API ROUTES
 app.use('/api/users',authRoutes);
+app.get('/api/extension', (req,res,next) => {
+    res.json(['hfoafkeghgdpiigjjgpdgjhikhdoppli']);
+});
 
 // "CATCH-ALL" ROUTE TO SERVE REACT-APP, MIGHT BE MIGRATED TO ANOTHER SERVER AND USE CORS
 app.get('/*', (req, res) => {

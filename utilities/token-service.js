@@ -52,7 +52,7 @@ try {
         await refreshToken.save();
         return token;
 } catch (error) {
-    console.log(error);
+    console.error(error);
     throw error;
 }
 }
@@ -87,12 +87,7 @@ async function refreshTokens(refreshToken) {
         }
         throw new Error('Invalid Refresh Token');
     } catch (error) {
-        console.log(error);
-        try {
-            await RefreshToken.expireAll();
-        } catch (e) {
-            throw e;
-        }
+        console.error(error);
         throw error;
     }
 
