@@ -57,7 +57,15 @@ const getPublicKey = async (req, res, next) => {
 
 }
 const setPublicKey = async (req, res, next) => {
-
+    try {
+        const userId = tokenService.getUserFromToken(req.get('Authorization'))._id;
+        const user = await User.findById(userId);
+        if(!user) throw new Error('User not found');
+        if(user.publicKey) throw new Error('User has public key. Delete existing key first.');
+    } catch (error) {
+        console.error(error);
+        utils.respondWithStatus(res);
+    }
 }
 const getTokenStatus = async (req, res, next) => {
 

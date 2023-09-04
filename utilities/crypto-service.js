@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const forge = require('node-forge');
 
 const HASH_SALT_LENGTH = parseInt(process.env.HASH_SALT_LENGTH,10);
 const HASH_ITERS = Number(process.env.HASH_ITER_ROUNDS);
@@ -25,7 +26,19 @@ const compareHash = (password, hash) => {
     }));
 }
 
+const verifyPublicKeyFormat = publicKeyPem =>{
+    const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+    if(publicKey.n.bitLength() !== Number(process.env.ASYM_BITLENGTH)){
+        return false;
+    }
+    if(publicKey.e !== parseInt(process.env.ASYM_E,16)){
+        return false;
+    }
+    return true;
+}
+
 module.exports = {
     hashString,
     compareHash,
+    verifyPublicKeyFormat,
 }

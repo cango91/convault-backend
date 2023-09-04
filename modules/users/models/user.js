@@ -80,6 +80,15 @@ userSchema.pre('save', async function (next) {
     return next();
 });
 
+userSchema.pre('save', async function (next){
+    if(this.isModified('publicKey')){
+        if(!crypt.verifyPublicKeyFormat(this.publicKey)){
+            return next(new Error('Invalid key'));
+        }
+    }
+    return next();
+});
+
 userSchema.methods.verifyPassword = async function (password) {
     try {
         const verified = await crypt.compareHash(password, this.password);

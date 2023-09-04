@@ -63,6 +63,9 @@ try {
  * @returns {user}
  */
 function getUserFromToken(token) {
+    if(token && token.startsWith('Bearer ')){
+        token = token.replace('Bearer ','');
+    }
     return token ? parseJwt(token).user : null;
 }
 
