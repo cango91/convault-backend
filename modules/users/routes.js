@@ -4,7 +4,7 @@ const ctrl = require('./controller');
 
 router.post('/', ctrl.create);
 router.post('/login',ctrl.login);
-router.post('/logout', ctrl.logout);
+router.post('/logout', auth, ctrl.logout);
 router.post('/logout/all', auth, ctrl.logoutAll);
 router.post('/token-health', auth, ctrl.getTokenStatus);
 
