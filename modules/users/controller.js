@@ -36,7 +36,8 @@ const login = async (req, res, next) => {
 const logout = async (req, res, next) => {
     try {
         const refreshToken = req.newRefreshToken || req.cookies.refreshToken;
-        await tokenService.revokeRefreshToken(refreshToken);
+        const accessToken = res.getHeader('New-Access-Token') || req.get('Authorization').split(" ")[1];
+        await tokenService.revokeRefreshToken(accessToken, refreshToken);
         res.clearCookie('refreshToken');
         res.json({ message: 'Logged out successfully' });
     } catch (error) {

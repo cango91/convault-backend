@@ -15,7 +15,8 @@ const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
     } else {
         return await lock.acquire(key, async () => {
             try {
-                if (verifySignature(accessToken, process.env.JWT_SECRET) && verifySignature(refreshToken, process.env.REFRESH_SECRET)) {
+                if (verifySignature(accessToken, process.env.JWT_SECRET)
+                    && verifySignature(refreshToken, process.env.REFRESH_SECRET)) {
                     await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
                     const storedToken = await RefreshToken.findOne({ token: refreshToken });
                     const user = await User.findById(getUserFromToken(accessToken));
@@ -23,7 +24,7 @@ const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
                     const newRefreshToken = signRefreshToken(user);
                     const newJwt = createJwt(user, process.env.JWT_EXP);
                     await storedToken.save();
-                    return {accessToken:newJwt, refreshToken:newRefreshToken};
+                    return { accessToken: newJwt, refreshToken: newRefreshToken };
                 } else {
                     throw new Error('Invalid Signature');
                 }
@@ -141,10 +142,12 @@ async function refreshTokens(refreshToken) {
 
 }
 
-async function revokeRefreshToken(refreshToken) {
+async function revokeRefreshToken(accessToken, refreshToken) {
     try {
-        await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
-        await RefreshToken.updateOne({ token: refreshToken }, { status: 'revoked' });
+        return await lock.acquire(quickDigest(accessToken + '::' + refreshToken), async () => {
+            await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
+            await RefreshToken.findOneAndUpdate({ token: refreshToken }, { status: 'revoked' });
+        });
     } catch (error) {
         console.error(error);
         throw error;
