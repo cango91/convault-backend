@@ -48,7 +48,7 @@ refreshToken.statics.isValid = async function (user, token) {
         if(storedToken.status === 'revoked') return false;
         if (storedToken.expiresAt < new Date())
             await storedToken.expire();
-        return storedToken.user.equals(user) && storedToken.status === 'valid';
+        return storedToken.user._id.equals(user._id) && storedToken.status === 'valid';
     } catch (error) {
         console.error(error);
         return false;

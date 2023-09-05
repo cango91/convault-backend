@@ -31,7 +31,7 @@ const verifyPublicKeyFormat = publicKeyPem =>{
     if(publicKey.n.bitLength() !== Number(process.env.ASYM_BITLENGTH)){
         return false;
     }
-    if(publicKey.e !== parseInt(process.env.ASYM_E,16)){
+    if(parseInt(publicKey.e) !== parseInt(process.env.ASYM_E,16)){
         return false;
     }
     return true;

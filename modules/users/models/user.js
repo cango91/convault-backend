@@ -36,7 +36,6 @@ const userSchema = new mongoose.Schema({
         trim: true,
         minLength: 8,
         required: true,
-        validate: [validatePasswordPattern, "{PATH} does not meet minimum pattern requirements"]
     },
     salt: {
         type: String,
@@ -62,6 +61,7 @@ userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
     // Replace the password with the computed hash
     try {
+        if(!validatePasswordPattern(this.password)) throw new Error("Insecure passwor not allowed");
         this.password = await crypt.hashString(this.password);
         return next();
     } catch (error) {

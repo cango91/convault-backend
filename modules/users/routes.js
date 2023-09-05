@@ -10,7 +10,7 @@ router.post('/token-health', auth, ctrl.getTokenStatus);
 
 // router.post('/user/change-password', auth);
 router.post('/status', auth, ctrl.setUserStatus);
-router.post('/pk', auth), ctrl.setPublicKey;
+router.post('/pk', auth, ctrl.setPublicKey);
 
 router.get('/:id/status', auth, ctrl.getUserStatus);
 router.get('/:id/pk', auth, ctrl.getPublicKey);

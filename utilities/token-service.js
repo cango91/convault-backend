@@ -2,6 +2,14 @@ const jwt = require('jsonwebtoken');
 const RefreshToken = require('../modules/users/models/refreshToken');
 const { toSeconds } = require('./utils');
 
+const signRefreshToken = (user) => {
+    return jwt.sign(
+        { user, timestamp: process.hrtime.bigint().toString() },
+        process.env.REFRESH_SECRET,
+        { expiresIn: process.env.REFRESH_EXP }
+    );
+}
+
 /**
  * Parses a given jwt using base64url and returns its payload
  * @param {*} token 
@@ -37,25 +45,23 @@ function createJwt(user, expiresIn) {
  * @returns {jwt}
  */
 async function createRefreshToken(user, expiresIn) {
-try {
-        const token = jwt.sign(
-            { user },
-            process.env.REFRESH_SECRET,
-            { expiresIn: expiresIn }
-        );
+    try {
+        const token = signRefreshToken(user);
         const refreshToken = new RefreshToken({
             token,
             user: user.id,
-            expiresAt: new Date(toSeconds(expiresIn) * 1000)
+            expiresAt: new Date(Date.now() + toSeconds(expiresIn) * 1000)
         });
-    
+
         await refreshToken.save();
         return token;
-} catch (error) {
-    console.error(error);
-    throw error;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
 }
-}
+
+
 
 /**
  * Gets the user by parsing the provided jwt 
@@ -63,8 +69,8 @@ try {
  * @returns {user}
  */
 function getUserFromToken(token) {
-    if(token && token.startsWith('Bearer ')){
-        token = token.replace('Bearer ','');
+    if (token && token.startsWith('Bearer ')) {
+        token = token.replace('Bearer ', '');
     }
     return token ? parseJwt(token).user : null;
 }
@@ -83,12 +89,15 @@ async function refreshTokens(refreshToken) {
         await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
         const user = getUserFromToken(refreshToken);
         if (await RefreshToken.isValid(user, refreshToken)) {
-            await RefreshToken.updateOne({token:refreshToken},{status: 'revoked'});
-            const newRefreshToken = await createRefreshToken(user, process.env.REFRESH_EXP);
+            //await RefreshToken.updateOne({ token: refreshToken }, { status: 'revoked' });
+            const newRefreshToken = signRefreshToken(user);
             const newJwt = createJwt(user, process.env.JWT_EXP);
+            await RefreshToken.findOneAndUpdate({ token: newRefreshToken });
             return { accessToken: newJwt, refreshToken: newRefreshToken };
+        } else {
+            console.error(`Invalid token: ${refreshToken}`);
+            throw new Error('Invalid Refresh Token');
         }
-        throw new Error('Invalid Refresh Token');
     } catch (error) {
         console.error(error);
         throw error;
@@ -96,10 +105,10 @@ async function refreshTokens(refreshToken) {
 
 }
 
-async function revokeRefreshToken(refreshToken){
+async function revokeRefreshToken(refreshToken) {
     try {
         await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
-        await RefreshToken.updateOne({token:refreshToken}, {status: 'revoked'});
+        await RefreshToken.findOneAndUpdate({ token: refreshToken }, { status: 'revoked' }, { new: true });
     } catch (error) {
         console.error(error);
         throw error;
