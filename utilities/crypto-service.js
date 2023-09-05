@@ -37,8 +37,14 @@ const verifyPublicKeyFormat = publicKeyPem =>{
     return true;
 }
 
+const quickDigest = data =>{
+    return crypto.createHash('md5').update(data).digest('hex');
+}
+
+
 module.exports = {
     hashString,
     compareHash,
     verifyPublicKeyFormat,
+    quickDigest,
 }

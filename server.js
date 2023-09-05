@@ -26,6 +26,8 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.use(sanitize());
 app.use(cookieParser());
 
+app.post('/api/users/refresh',require('./modules/users/controller').manualRefreshToken);
+
 app.use(bearer);
 
 // API ROUTES

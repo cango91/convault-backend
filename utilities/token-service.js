@@ -1,6 +1,42 @@
 const jwt = require('jsonwebtoken');
 const RefreshToken = require('../modules/users/models/refreshToken');
+const User = require('../modules/users/models/user');
+const AsyncLock = require('async-lock');
 const { toSeconds } = require('./utils');
+const { quickDigest } = require('./crypto-service');
+
+const idempotencyMap = {};
+const lock = new AsyncLock();
+
+const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
+    const key = quickDigest(accessToken + '::' + refreshToken);
+    if (key in idempotencyMap) {
+        return idempotencyMap[key];
+    } else {
+        return await lock.acquire(key, async () => {
+            try {
+                if (verifySignature(accessToken, process.env.JWT_SECRET) && verifySignature(refreshToken, process.env.REFRESH_SECRET)) {
+                    await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
+                    const storedToken = await RefreshToken.findOne({ token: refreshToken });
+                    const user = await User.findById(getUserFromToken(accessToken));
+                    if (storedToken.status !== 'valid' || !storedToken.user._id.equals(user._id)) throw new Error('Invalid token');
+                    const newRefreshToken = signRefreshToken(user);
+                    const newJwt = createJwt(user, process.env.JWT_EXP);
+                    await storedToken.save();
+                    return {accessToken:newJwt, refreshToken:newRefreshToken};
+                } else {
+                    throw new Error('Invalid Signature');
+                }
+            } catch (error) {
+                console.error(error);
+                throw error;
+            }
+        }).then(tokens => {
+            idempotencyMap[quickDigest(tokens.accessToken + '::' + tokens.refreshToken)] = { accessToken, refreshToken };
+            return tokens;
+        });
+    }
+}
 
 const signRefreshToken = (user) => {
     return jwt.sign(
@@ -87,12 +123,12 @@ function getUserFromToken(token) {
 async function refreshTokens(refreshToken) {
     try {
         await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
-        const user = getUserFromToken(refreshToken);
+        const user = await User.findById(getUserFromToken(refreshToken)._id);
         if (await RefreshToken.isValid(user, refreshToken)) {
             //await RefreshToken.updateOne({ token: refreshToken }, { status: 'revoked' });
             const newRefreshToken = signRefreshToken(user);
             const newJwt = createJwt(user, process.env.JWT_EXP);
-            await RefreshToken.findOneAndUpdate({ token: newRefreshToken });
+            await RefreshToken.findOneAndUpdate({ token: refreshToken }, { token: newRefreshToken }, { new: true });
             return { accessToken: newJwt, refreshToken: newRefreshToken };
         } else {
             console.error(`Invalid token: ${refreshToken}`);
@@ -108,7 +144,7 @@ async function refreshTokens(refreshToken) {
 async function revokeRefreshToken(refreshToken) {
     try {
         await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
-        await RefreshToken.findOneAndUpdate({ token: refreshToken }, { status: 'revoked' }, { new: true });
+        await RefreshToken.updateOne({ token: refreshToken }, { status: 'revoked' });
     } catch (error) {
         console.error(error);
         throw error;
@@ -150,7 +186,14 @@ function setCookie(res, refreshToken) {
         });
 }
 
-
+function verifySignature(token, secret = process.env.JWT_SECRET) {
+    try {
+        jwt.verify(token, secret, { algorithms: ["HS256"], ignoreExpiration: true });
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
 
 module.exports = {
     parseJwt,
@@ -161,4 +204,6 @@ module.exports = {
     verifyJwt,
     setCookie,
     revokeRefreshToken,
+    verifySignature,
+    refreshTokensIdempotent,
 }
