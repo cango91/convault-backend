@@ -1,6 +1,7 @@
 const http = require('http');
 const socketIO = require('socket.io');
 const tokenService = require('./utilities/token-service');
+const chatService = require('./utilities/chat-service');
 
 module.exports = (app) => {
     const server = http.createServer(app);
@@ -26,7 +27,7 @@ module.exports = (app) => {
                 next();
             });
     });
-    io.on('connect', (socket) => {
+    io.on('connect', async (socket) => {
         const id = socket.id;
         let authenticated = true;
         let safetyMargin = 5000; // 5 seconds
@@ -35,6 +36,7 @@ module.exports = (app) => {
             socket.emit('reauth');
             console.log(`${id}: must reauth`);
         }
+        // initialize re-auth logic
         let t = setTimeout(reauth, socket.decoded.exp * 1000 - Date.now() - safetyMargin);
         socket.on('reauth', ({token}) => {
             if(!typeof(token) === 'string'){
@@ -61,6 +63,10 @@ module.exports = (app) => {
                 });
         });
         console.log(`New client connected: ${id}`);
+
+        // send all user sessions
+        console.log(`${id}: sending all sessions`);
+        socket.emit("all-sessions", await chatService.getUserSessions(socket.decoded.user._id));
 
         socket.on('disconnect', s => {
             console.log(`Client disconnected: ${id}`);
