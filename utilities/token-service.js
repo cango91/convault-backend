@@ -8,7 +8,13 @@ const { quickDigest } = require('./crypto-service');
 const idempotencyMap = {};
 const lock = new AsyncLock();
 
-const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
+async function refreshTokensIdempotent({ accessToken, refreshToken }) {
+    // console.log("--KEYS--");
+    // for(let key in idempotencyMap){
+    //     console.log(`* ${key}`);
+    //     console.log(`access exp: ${new Date(1000 * jwt.decode(idempotencyMap[key].accessToken).exp)}`)
+    //     console.log(`refresh exp: ${new Date(1000 * jwt.decode(idempotencyMap[key].refreshToken).exp)}`)
+    // }
     const key = quickDigest(accessToken + '::' + refreshToken);
     if (key in idempotencyMap) {
         return idempotencyMap[key];
@@ -20,9 +26,11 @@ const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
                     await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
                     const storedToken = await RefreshToken.findOne({ token: refreshToken });
                     const user = await User.findById(getUserFromToken(accessToken));
-                    if (storedToken.status !== 'valid' || !storedToken.user._id.equals(user._id)) throw new Error('Invalid token');
+                    if (!storedToken || storedToken.status !== 'valid' || !storedToken.user._id.equals(user._id)) throw new Error('Invalid token');
                     const newRefreshToken = signRefreshToken(user);
                     const newJwt = createJwt(user, process.env.JWT_EXP);
+                    storedToken.token = newRefreshToken;
+                    storedToken.expiresAt = new Date(parseJwt(newRefreshToken).exp * 1000)
                     await storedToken.save();
                     return { accessToken: newJwt, refreshToken: newRefreshToken };
                 } else {
@@ -33,13 +41,13 @@ const refreshTokensIdempotent = async ({ accessToken, refreshToken }) => {
                 throw error;
             }
         }).then(tokens => {
-            idempotencyMap[quickDigest(tokens.accessToken + '::' + tokens.refreshToken)] = { accessToken, refreshToken };
+            idempotencyMap[quickDigest(accessToken + '::' + refreshToken)] = { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
             return tokens;
         });
     }
 }
 
-const signRefreshToken = (user) => {
+function signRefreshToken(user){
     return jwt.sign(
         { user, timestamp: process.hrtime.bigint().toString() },
         process.env.REFRESH_SECRET,

@@ -38,7 +38,7 @@ const verifyPublicKeyFormat = publicKeyPem => {
 }
 
 const quickDigest = data => {
-    return crypto.createHash('md5').update(data).digest('hex');
+    return crypto.createHash('sha256').update(data).digest('hex');
 }
 
 const encrypt = plainText => {
