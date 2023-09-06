@@ -55,13 +55,18 @@ describe('ChatSession Model', () => {
             user2:user2._id,
             head: message2._id
         });
+        
         session.user1Status = "deleted";
         session.user2Status = "deleted";
         await session.save();
-        deletedSession = await ChatSession.findById(session._id);
+
+        const deletedSession = await ChatSession.findById(session._id).exec();
         expect(deletedSession).toBeNull();
-        
-    })
+        let deletedMessage = await Message.findById(message1._id).exec();
+        expect(deletedMessage).toBeNull();
+        deletedMessage = await Message.findById(message2._id).exec();
+        expect(deletedMessage).toBeNull();
+    });
 
 });
 
