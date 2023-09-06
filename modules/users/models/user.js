@@ -61,7 +61,7 @@ userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
     // Replace the password with the computed hash
     try {
-        if(!validatePasswordPattern(this.password)) throw new Error("Insecure passwor not allowed");
+        if(!validatePasswordPattern(this.password)) throw new Error("Password too insecure");
         this.password = await crypt.hashString(this.password);
         return next();
     } catch (error) {

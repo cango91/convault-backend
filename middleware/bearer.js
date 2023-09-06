@@ -14,7 +14,6 @@ module.exports = async (req, res, next) => {
             if (e.name === 'TokenExpiredError') {
                 const refreshToken = req.newRefreshToken || req.cookies.refreshToken;
                 if (refreshToken) {
-                    console.log('Bearer mw: Trying refresh');
                     try {
                         //const tokens = await tokenService.refreshTokens(refreshToken);
                         const tokens = await tokenService.refreshTokensIdempotent({ accessToken: token, refreshToken });
@@ -22,7 +21,6 @@ module.exports = async (req, res, next) => {
                         res.set('New-Access-Token', tokens.accessToken);
                         tokenService.setCookie(res, tokens.refreshToken);
                         req.newRefreshToken = tokens.refreshToken;
-                        console.log('Bearer mw: Refreshed tokens');
                         return next();
                     } catch (err) {
                         // Fall through to end, where req.user is already null.
