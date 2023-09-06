@@ -51,6 +51,10 @@ const userSchema = new mongoose.Schema({
                 delete ret.password;
                 delete ret.email;
                 delete ret.salt;
+                if(ret.publicKey){
+                    ret.hasPublicKey = true;
+                }
+                delete ret.publicKey;
                 return ret;
             }
         }

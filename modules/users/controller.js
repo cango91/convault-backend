@@ -2,6 +2,7 @@ const User = require('./models/user');
 const tokenService = require('../../utilities/token-service');
 const utils = require('../../utilities/utils');
 
+/** Create new User */
 const create = async (req, res, next) => {
     try {
         const user = new User(req.body);
@@ -16,6 +17,7 @@ const create = async (req, res, next) => {
     }
 }
 
+/** Log existing User in */
 const login = async (req, res, next) => {
     try {
         const { username, password } = req.body;
@@ -33,6 +35,8 @@ const login = async (req, res, next) => {
         utils.respondWithStatus(res);
     }
 }
+
+/** Log a User out by revoking their current refresh token and clearing their cookie */
 const logout = async (req, res, next) => {
     try {
         const refreshToken = req.newRefreshToken || req.cookies.refreshToken;
@@ -45,6 +49,8 @@ const logout = async (req, res, next) => {
         utils.respondWithStatus(res);
     }
 }
+
+/** Log a User out by revoking all of their valid refresh tokens and clearing current UA's cookie */
 const logoutAll = async (req, res, next) => {
 
 }
@@ -54,9 +60,25 @@ const getUserStatus = async (req, res, next) => {
 const setUserStatus = async (req, res, next) => {
 
 }
-const getPublicKey = async (req, res, next) => {
 
+/** Get the public key of a User */
+const getPublicKey = async (req, res, next) => {
+    try {
+        // TODO: Add friend-or-self check
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        if(user && user.publicKey){
+            res.json({publicKey: user.publicKey});
+        }else{
+            res.status(404).json({message: "public key not found"});
+        }
+    } catch (error) {
+        console.error(error);
+        utils.respondWithStatus(res);
+    }
 }
+
+/** Set a User's public key if one does not exist already */
 const setPublicKey = async (req, res, next) => {
     try {
         const userId = req.user._id;
@@ -79,10 +101,13 @@ const setPublicKey = async (req, res, next) => {
         utils.respondWithStatus(res);
     }
 }
+
+/** TODO: Return information about current refresh cookie of User */
 const getTokenStatus = async (req, res, next) => {
 
 }
 
+/** Manual endpoint for refreshing jwts */
 const manualRefreshToken = async (req, res, next) => {
     // verify jwt signature
     try {

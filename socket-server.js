@@ -64,6 +64,7 @@ module.exports = (app) => {
 
         socket.on('disconnect', s => {
             console.log(`Client disconnected: ${id}`);
+            clearTimeout(t);
         });
     });
     return server;
