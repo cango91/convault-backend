@@ -57,6 +57,10 @@ const calculateUnreadCount = async (session, userId) => {
     return unreadCount;
 }
 
+const getMessageDate = async(messageId)=>{
+    return (await Message.findById(messageId)).createdAt;
+}
+
 /** Fetch the active and archived sessions of a user with unread messages count */
 const getUserSessions = async (userId) => {
     try {
@@ -64,6 +68,7 @@ const getUserSessions = async (userId) => {
         for (let session of sessions) {
             session.decryptHead();
             session.unreadCount = await calculateUnreadCount(session, userId);
+            session.lastMessageDate = await getMessageDate(session.head);
         }
         return sessions;
     } catch (error) {

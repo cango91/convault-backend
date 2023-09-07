@@ -27,11 +27,17 @@ module.exports = (app) => {
                 next();
             });
     });
+    const onlineUsers = new Set();
     io.on('connect', async (socket) => {
         const id = socket.id;
+        const userId = socket.decoded.user._id;
         let authenticated = true;
+        onlineUsers.add(userId);
         let safetyMargin = 5000; // 5 seconds
         const reauth = () => {
+            // if(!authenticated){
+            //     socket.disconnect();
+            // }
             authenticated = false;
             socket.emit('reauth');
             console.log(`${id}: must reauth`);
@@ -65,11 +71,21 @@ module.exports = (app) => {
         console.log(`New client connected: ${id}`);
 
         // send all user sessions
-        console.log(`${id}: sending all sessions`);
-        socket.emit("all-sessions", await chatService.getUserSessions(socket.decoded.user._id));
+        setTimeout(async ()=>{
+            console.log(`${id}: sending all sessions`);
+            socket.emit("all-sessions", await chatService.getUserSessions(userId));
+        },100);
 
-        socket.on('disconnect', s => {
+        socket.on('send-all-sessions', async () =>{
+            if(authenticated){
+                console.log(`${id}: sending all sessions on request`);
+                socket.emit("all-sessions", await chatService.getUserSessions(userId));
+            }
+        });
+
+        socket.on('disconnect', () => {
             console.log(`Client disconnected: ${id}`);
+            onlineUsers.delete(userId);
             clearTimeout(t);
         });
     });

@@ -107,7 +107,7 @@ describe("Chat Service", ()=>{
         const user2Sessions = await chatService.getUserSessions(user2._id.toString());
         expect(user2Sessions.length).toEqual(1);
         expect(user2Sessions.filter(s => s.equals(session)).map(s => s.unreadCount)[0]).toBe(2);
-
+        expect(user1Sessions[0].lastMessageDate).toBeInstanceOf(Date);
     })
 
 });
