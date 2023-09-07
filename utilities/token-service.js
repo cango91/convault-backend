@@ -9,43 +9,36 @@ const idempotencyMap = {};
 const lock = new AsyncLock();
 
 async function refreshTokensIdempotent({ accessToken, refreshToken }) {
-    // console.log("--KEYS--");
-    // for(let key in idempotencyMap){
-    //     console.log(`* ${key}`);
-    //     console.log(`access exp: ${new Date(1000 * jwt.decode(idempotencyMap[key].accessToken).exp)}`)
-    //     console.log(`refresh exp: ${new Date(1000 * jwt.decode(idempotencyMap[key].refreshToken).exp)}`)
-    // }
     const key = quickDigest(accessToken + '::' + refreshToken);
-    if (key in idempotencyMap) {
+    return await lock.acquire(key, async () => {
+      if (key in idempotencyMap) {
         return idempotencyMap[key];
-    } else {
-        return await lock.acquire(key, async () => {
-            try {
-                if (verifySignature(accessToken, process.env.JWT_SECRET)
-                    && verifySignature(refreshToken, process.env.REFRESH_SECRET)) {
-                    await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
-                    const storedToken = await RefreshToken.findOne({ token: refreshToken });
-                    const user = await User.findById(getUserFromToken(accessToken));
-                    if (!storedToken || storedToken.status !== 'valid' || !storedToken.user._id.equals(user._id)) throw new Error('Invalid token');
-                    const newRefreshToken = signRefreshToken(user);
-                    const newJwt = createJwt(user, process.env.JWT_EXP);
-                    storedToken.token = newRefreshToken;
-                    storedToken.expiresAt = new Date(parseJwt(newRefreshToken).exp * 1000)
-                    await storedToken.save();
-                    return { accessToken: newJwt, refreshToken: newRefreshToken };
-                } else {
-                    throw new Error('Invalid Signature');
-                }
-            } catch (error) {
-                console.error(error);
-                throw error;
-            }
-        }).then(tokens => {
-            idempotencyMap[quickDigest(accessToken + '::' + refreshToken)] = { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
+      } else {
+        try {
+          if (verifySignature(accessToken, process.env.JWT_SECRET)
+              && verifySignature(refreshToken, process.env.REFRESH_SECRET)) {
+            await verifyJwt(refreshToken, process.env.REFRESH_SECRET);
+            const storedToken = await RefreshToken.findOne({ token: refreshToken });
+            const user = await User.findById(getUserFromToken(accessToken));
+            if (!storedToken || storedToken.status !== 'valid' || !storedToken.user._id.equals(user._id)) throw new Error('Invalid token');
+            const newRefreshToken = signRefreshToken(user);
+            const newJwt = createJwt(user, process.env.JWT_EXP);
+            storedToken.token = newRefreshToken;
+            storedToken.expiresAt = new Date(parseJwt(newRefreshToken).exp * 1000);
+            await storedToken.save();
+            const tokens = { accessToken: newJwt, refreshToken: newRefreshToken };
+            idempotencyMap[key] = tokens;
             return tokens;
-        });
-    }
-}
+          } else {
+            throw new Error('Invalid Signature');
+          }
+        } catch (error) {
+          console.error(error);
+          throw error;
+        }
+      }
+    });
+  }
 
 function signRefreshToken(user){
     return jwt.sign(
