@@ -9,6 +9,14 @@ async function createRequest(user, to) {
         const fromUser = await User.findById(user);
         const toUser = await User.findById(to);
         if (!fromUser || !toUser) throw new Error('Invalid user');
+        const existing = await FriendRequest.findOne(
+            {
+                $or: [{
+                    senderId: fromUser, recipientId: toUser
+                },
+                { recipientId: fromUser, senderId: toUser }]
+            });
+        if (existing) throw new Error('Friend Request already exists');
         const fr = await FriendRequest.create({
             senderId: fromUser,
             recipientId: toUser,
@@ -20,26 +28,52 @@ async function createRequest(user, to) {
     }
 }
 
-async function acceptRequest(requestId) {
+async function acceptRequest(recipientId, requestId) {
     try {
         const fr = await FriendRequest.findById(requestId);
-        if (!fr) throw new Error('FriendRequest not found');
+        if (!fr) throw new Error('Friend Request not found');
+        if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
         return await fr.accept();
     } catch (error) {
         console.error(error);
         throw error;
     }
 }
-async function rejectRequest(requestId) {
+async function rejectRequest(recipientId, requestId) {
     try {
         const fr = await FriendRequest.findById(requestId);
-        if (!fr) throw new Error('FriendRequest not found');
+        if (!fr) throw new Error('Friend Request not found');
+        if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
         return await fr.reject();
     } catch (error) {
         console.error(error);
         throw error;
     }
 }
+
+async function userAcceptsRequestOf(userId, senderId) {
+    try {
+        const fr = await FriendRequest.findOne({senderId, recipientId: userId, status: 'pending'});
+        if(!fr) throw new Error('Friend Request not found');
+        return await fr.accept();
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+async function userRejectsRequestOf(userId, senderId) {
+    try {
+        const fr = await FriendRequest.findOne({senderId, recipientId: userId, status: 'pending'});
+        if(!fr) throw new Error('Friend Request not found');
+        return await fr.reject();
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+
 
 async function blockUser(blockerId, blockedId) {
     try {
@@ -104,8 +138,6 @@ async function getAllFriendsOfUser(userId) {
                         { senderId: new mongoose.Types.ObjectId(userId) },
                         { recipientId: new mongoose.Types.ObjectId(userId) }
                     ],
-                    // exclude rejected requests
-                    status: { $ne: 'rejected' },
                 }
             },
             {
@@ -120,11 +152,17 @@ async function getAllFriendsOfUser(userId) {
                     },
                     // was the friend request sent or received?
                     friendRequest: {
-                        $cond: [
-                            { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
-                            "sent",
-                            "received"
-                        ]
+                        _id: "$_id",
+                        direction: {
+                            $cond: [
+                                { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
+                                "sent",
+                                "received"
+                            ]
+                        },
+                        status: "$status",
+                        sentAt: "$createdAt",
+                        repliedAt: { $cond: [{ $ne: ["$updatedAt", "$createdAt"] }, "$updatedAt", null] },
                     }
                 }
             },
@@ -139,6 +177,10 @@ async function getAllFriendsOfUser(userId) {
             },
             {
                 $unwind: { path: '$contact' },
+            },
+            // if friendRequest is rejected, don't send only username
+            {
+                $set: { contact: { $cond: [{ $eq: ["$status", 'accepted'] }, "$contact", { username: "$contact.username" }] } }
             },
             {
                 $unset: [
@@ -178,11 +220,14 @@ async function getAllFriendsOfUser(userId) {
                 $project: {
                     recipientId: 0,
                     senderId: 0,
-                    _id: 0,
                     blockedByUser: 0,
                     userBlocked: 0,
                     contactId: 0,
                     __v: 0,
+                    _id: 0,
+                    status: 0,
+                    createdAt: 0,
+                    updatedAt: 0,
                 }
             }
         ]);
@@ -204,4 +249,6 @@ module.exports = {
     unBlockUser,
     deleteBlock,
     getAllFriendsOfUser,
+    userAcceptsRequestOf,
+    userRejectsRequestOf,
 }

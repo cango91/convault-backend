@@ -21,10 +21,12 @@ friendRequestSchema.pre("save", async function (next) {
 });
 
 friendRequestSchema.methods.accept = async function () {
+    if(this.status !== 'pending') throw new Error('Friend request already answered');
     return await this.updateOne({ status: 'accepted' }, { new: true });
 }
 
 friendRequestSchema.methods.reject = async function () {
+    if(this.status !== 'pending') throw new Error('Friend request already answered');
     return await this.updateOne({ status: 'rejected' }, { new: true });
 }
 

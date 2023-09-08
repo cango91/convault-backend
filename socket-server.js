@@ -1,7 +1,10 @@
 const http = require('http');
 const socketIO = require('socket.io');
+const usersController = require('./modules/users/controller');
 const tokenService = require('./utilities/token-service');
 const chatService = require('./utilities/chat-service');
+const socialController = require('./modules/social/controller');
+const SlidingWindowRateLimiter = require('./utilities/sliding-window-rate-limiter');
 
 module.exports = (app) => {
     const server = http.createServer(app);
@@ -21,18 +24,30 @@ module.exports = (app) => {
                 return next(new Error('Authentication error'));
             })
             .then(decoded => {
-                if(!decoded) return next(new Error('Authentication error'));
-                console.log(new Date(decoded.exp*1000));
+                if (!decoded) return next(new Error('Authentication error'));
+                console.log(new Date(decoded.exp * 1000));
                 socket.decoded = decoded;
                 next();
             });
     });
-    const onlineUsers = new Set();
+
+    const onlineUsers = {};
+
     io.on('connect', async (socket) => {
+        const notifyOnline = (id, eventName, eventData) => {
+            if (id in onlineUsers) {
+                socket.emit(eventName, eventData);
+            }
+        }
         const id = socket.id;
         const userId = socket.decoded.user._id;
         let authenticated = true;
-        onlineUsers.add(userId);
+        if (!onlineUsers[userId]) {
+            onlineUsers[userId] = new Set();
+        }
+        onlineUsers[userId].add(id);
+        const friendRequestLimiter = new SlidingWindowRateLimiter();
+
         let safetyMargin = 5000; // 5 seconds
         const reauth = () => {
             authenticated = false;
@@ -41,8 +56,8 @@ module.exports = (app) => {
         }
         // initialize re-auth logic
         let t = setTimeout(reauth, socket.decoded.exp * 1000 - Date.now() - safetyMargin);
-        socket.on('reauth', ({token}) => {
-            if(!typeof(token) === 'string'){
+        socket.on('reauth', ({ token }) => {
+            if (!typeof (token) === 'string') {
                 console.error("invalid reauth token type");
                 socket.disconnect();
                 return;
@@ -54,7 +69,7 @@ module.exports = (app) => {
                     return;
                 })
                 .then((decoded) => {
-                    if(!decoded){
+                    if (!decoded) {
                         console.error('invalid reauth token');
                         socket.disconnect();
                         return;
@@ -67,22 +82,46 @@ module.exports = (app) => {
         });
         console.log(`New client connected: ${id}`);
 
-        // send all user sessions
-        // setTimeout(async ()=>{
-        //     console.log(`${id}: sending all sessions`);
-        //     socket.emit("all-sessions", await chatService.getUserSessions(userId));
-        // },100);
-
-        socket.on('send-all-sessions', async () =>{
-            if(authenticated){
-                console.log(`${id}: sending all sessions on request`);
-                socket.emit("all-sessions", await chatService.getUserSessions(userId));
+        socket.on('send-friend-request', async ({ friendUsername }) => {
+            if (authenticated) {
+                if (!friendRequestLimiter.isRateLimited(userId)) {
+                    try {
+                        const otherId = await usersController.getIdFromUsername(friendUsername);
+                        const friendRequest = socialController.createRequest(userId, otherId);
+                        socket.emit('friend-request-sent', { friendRequest });
+                        notifyOnline('friend-request-received', friendRequest);
+                    } catch (error) {
+                        socket.emit('error', { event: 'send-friend-request', message: error.message });
+                    }
+                } else {
+                    socket.emit('error', { event: 'send-friend-request', message: 'Too many requests' });
+                }
             }
         });
 
+        
+
+
+        // send out contacts and chat sessions data on session beginning
+        try {
+            socket.emit('all-contacts', await socialController.getAllFriendsOfUser(userId));
+        } catch (error) {
+            socket.emit('error', { message: 'Could not retrieve contacts' });
+        }
+
+        try {
+            socket.emit('all-sessions', await chatService.getUserSessions(userId));
+        } catch (error) {
+            socket.emit('error', { message: 'Could not retrieve chat sessions' });
+        }
+
+
+
         socket.on('disconnect', () => {
             console.log(`Client disconnected: ${id}`);
-            onlineUsers.delete(userId);
+            //onlineUsers.delete(userId);
+            onlineUsers[userId].delete(id);
+            if (!onlineUsers[userId].size) delete onlineUsers[userId];
             clearTimeout(t);
         });
     });

@@ -17,9 +17,13 @@ beforeAll(async () => {
     user2 = await User.create({
         username: 'usessr2',
         email: 'maaail2@test.com',
-        password: 'alsoVeryStrongPassword!2'
+        password: 'alsoVeryStrongPassword!2',
     });
 });
+
+beforeEach(async()=>{
+    await FR.deleteMany({});
+})
 
 
 afterAll(async () => {
@@ -61,8 +65,8 @@ describe("Social Controller", () => {
         expect(foundFr1.status).toBe('pending');
         expect(foundFr2.status).toBe('pending');
 
-        await frCtrl.acceptRequest(fr1._id);
-        await frCtrl.rejectRequest(fr2._id);
+        await frCtrl.acceptRequest(user3._id,fr1._id);
+        await frCtrl.rejectRequest(user3._id,fr2._id);
 
         foundFr1 = await FR.findById(fr1._id).exec();
         foundFr2 = await FR.findById(fr2._id).exec();
@@ -70,6 +74,20 @@ describe("Social Controller", () => {
         expect(foundFr1.status).toBe('accepted');
         expect(foundFr2.status).toBe('rejected');
     });
+
+    it("should not allow other users to accept/reject on the recipient's behalf", async()=>{
+        const user3 = await User.create({
+            username: 'Yetuzer3',
+            email: 'maisl3@test.com',
+            password: 'yestAnotherStrongPassword!3'
+        });
+        const fr1 = await FR.create({senderId:user1,recipientId:user2});
+        await expect(frCtrl.acceptRequest(user3, fr1._id )).rejects.toThrow();
+        await expect(frCtrl.acceptRequest(user1, fr1._id )).rejects.toThrow();
+        await expect(frCtrl.rejectRequest(user3, fr1._id )).rejects.toThrow();
+        await expect(frCtrl.rejectRequest(user1, fr1._id )).rejects.toThrow();
+
+    })
 
     it("should block contacts", async () => {
         const bc = await frCtrl.blockUser(user1._id, user2._id);
@@ -132,13 +150,13 @@ describe("Social Controller", () => {
         
 
         const allFriendsBefore = await frCtrl.getAllFriendsOfUser(user1);
-        expect(allFriendsBefore.length).toBe(2);
+        expect(allFriendsBefore.length).toBe(3);
 
         await frCtrl.blockUser(blockingUser,user1);
         await frCtrl.blockUser(user1,blockedUser);
 
         const allFriendsAfter = await frCtrl.getAllFriendsOfUser(user1);
-        expect(allFriendsAfter.length).toBe(2);
+        expect(allFriendsAfter.length).toBe(3);
 
         const blockedContacts = allFriendsAfter.filter(friend => friend.blockedContact).map(x => x.contact._id);
         expect(blockedContacts.length).toBe(1);
@@ -149,10 +167,10 @@ describe("Social Controller", () => {
 
         await frCtrl.createRequest(user1,pendingUser);
         const finalFriendList = await frCtrl.getAllFriendsOfUser(user1);
-        const pending = finalFriendList.find(f=>f.status==='pending');
-        expect(pending.contact._id).toEqual(pendingUser._id);
+        const pending = finalFriendList.find(f=>f.friendRequest.status==='pending');
+        expect(pending.contact.username).toEqual(pendingUser.username);
 
-        console.log(finalFriendList);
+        //console.log(finalFriendList);
         
 
     });
