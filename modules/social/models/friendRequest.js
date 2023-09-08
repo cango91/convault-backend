@@ -22,12 +22,14 @@ friendRequestSchema.pre("save", async function (next) {
 
 friendRequestSchema.methods.accept = async function () {
     if(this.status !== 'pending') throw new Error('Friend request already answered');
-    return await this.updateOne({ status: 'accepted' }, { new: true });
+    this.set({status: 'accepted'});
+    return await this.save();
 }
 
 friendRequestSchema.methods.reject = async function () {
     if(this.status !== 'pending') throw new Error('Friend request already answered');
-    return await this.updateOne({ status: 'rejected' }, { new: true });
+    this.set({status: 'rejected'});
+    return await this.save();
 }
 
 module.exports = mongoose.model('FriendRequest', friendRequestSchema);

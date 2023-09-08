@@ -1,10 +1,13 @@
 const http = require('http');
 const socketIO = require('socket.io');
+const validator = require('validator');
 const usersController = require('./modules/users/controller');
 const tokenService = require('./utilities/token-service');
 const chatService = require('./utilities/chat-service');
 const socialController = require('./modules/social/controller');
 const SlidingWindowRateLimiter = require('./utilities/sliding-window-rate-limiter');
+const handshake = require('./middleware/socket/handshake');
+const sanitize = require('./middleware/socket/sanitize');
 
 module.exports = (app) => {
     const server = http.createServer(app);
@@ -17,20 +20,11 @@ module.exports = (app) => {
             },
         });
     // middleware for initial jwt handshake
-    io.use((socket, next) => {
-        const token = socket.handshake.query.token;
-        tokenService.verifyJwt(token, process.env.JWT_SECRET)
-            .catch((err) => {
-                return next(new Error('Authentication error'));
-            })
-            .then(decoded => {
-                if (!decoded) return next(new Error('Authentication error'));
-                console.log(new Date(decoded.exp * 1000));
-                socket.decoded = decoded;
-                next();
-            });
-    });
+    io.use(handshake);
+    // middleware for sanitizing user data (strings)
+    io.use(sanitize);
 
+    // track online users' ids with client id sets
     const onlineUsers = {};
 
     io.on('connect', async (socket) => {
@@ -89,12 +83,41 @@ module.exports = (app) => {
                         const otherId = await usersController.getIdFromUsername(friendUsername);
                         const friendRequest = socialController.createRequest(userId, otherId);
                         socket.emit('friend-request-sent', { friendRequest });
-                        notifyOnline('friend-request-received', friendRequest);
+                        notifyOnline(otherId, 'friend-request-received', friendRequest);
                     } catch (error) {
                         socket.emit('error', { event: 'send-friend-request', message: error.message });
                     }
                 } else {
                     socket.emit('error', { event: 'send-friend-request', message: 'Too many requests' });
+                }
+            }
+        });
+
+        socket.on('accept-friend-request',async ({requestId}) =>{
+            if(authenticated){
+                try {
+                    const response = await socialController.acceptRequest(userId,requestId);
+                    const data = {
+                        friendRequest:{
+                            _id: response._id,
+                            repliedAt: response.updatedAt,
+                        },
+                        contact: {
+                            _id: response.senderId._id,
+                            publicKey: response.senderId.publicKey
+                        }
+                    }
+                    socket.emit('friend-request-accepted',{data});
+                    const notifyData = {
+                        ...data,
+                        contact:{
+                            _id: response.recipientId._id,
+                            publicKey: response._recipientId.publicKey
+                        }
+                    }
+                    notifyOnline(response.senderId._id.toString(),'friend-request-accepted',{data: notifyData})
+                } catch (error) {
+                    socket.emit('accept-friend-request-error', {message: error.message});
                 }
             }
         });

@@ -33,7 +33,8 @@ async function acceptRequest(recipientId, requestId) {
         const fr = await FriendRequest.findById(requestId);
         if (!fr) throw new Error('Friend Request not found');
         if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
-        return await fr.accept();
+        const accepted = await fr.accept();
+        return await (await accepted.populate("senderId")).populate("recipientId");
     } catch (error) {
         console.error(error);
         throw error;
@@ -44,7 +45,8 @@ async function rejectRequest(recipientId, requestId) {
         const fr = await FriendRequest.findById(requestId);
         if (!fr) throw new Error('Friend Request not found');
         if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
-        return await fr.reject();
+        const rejected = await fr.reject();
+        return await (await rejected.populate("senderId")).populate("recipientId");
     } catch (error) {
         console.error(error);
         throw error;
