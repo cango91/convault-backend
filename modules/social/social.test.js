@@ -104,4 +104,46 @@ describe("Social Controller", () => {
         expect(error).toBeDefined();
         expect(error.message).toBe('Can not block yourself'); 
     });
+
+    it("should get all contacts with blocked/blocked by information", async()=>{
+        await FR.deleteMany({});
+        await BC.deleteMany({});
+        const blockedUser = await User.create({
+            username: "blockedUser",
+            email: 'somemail@other.com',
+            password: 'veryStr0ng!pass'
+        });
+        const blockingUser = await User.create({
+            username: "IbLockEvery0ne",
+            email: "blockb@by.com",
+            password: "BlockTh1$"
+        });
+        const cr1 = await frCtrl.createRequest(user1,user2);
+        await cr1.reject();
+        const cr2 = await frCtrl.createRequest(user1,blockingUser);
+        await cr2.accept();
+        const cr3 = await frCtrl.createRequest(blockedUser,user1);
+        await cr3.accept();
+        const allFriendsBefore = await frCtrl.getAllFriendsOfUser(user1);
+        expect(allFriendsBefore.length).toBe(2);
+
+        await frCtrl.blockUser(blockingUser,user1);
+        await frCtrl.blockUser(user1,blockedUser);
+
+        const allFriendsAfter = await frCtrl.getAllFriendsOfUser(user1);
+        expect(allFriendsAfter.length).toBe(2);
+        console.log(allFriendsAfter);
+        const blockedContacts = allFriendsAfter.filter(friend => friend.blockedContact).map(x => x.contact);
+        expect(blockedContacts.length).toBe(1);
+        expect(blockedContacts[0]._id).toEqual(blockedUser._id);
+        
+        const blockingContacts = allFriendsAfter.filter(f=> f.blockedByContact).map(f=>f.contact);
+        expect(blockingContacts[0]._id).toEqual(blockingUser._id);
+
+
+        
+
+    });
+
+
 });

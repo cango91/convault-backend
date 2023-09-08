@@ -11,7 +11,7 @@ module.exports = (app) => {
             {
                 origin: "http://localhost:3000",
                 methods: ["GET", "POST"]
-            }
+            },
         });
     // middleware for initial jwt handshake
     io.use((socket, next) => {
@@ -35,11 +35,8 @@ module.exports = (app) => {
         onlineUsers.add(userId);
         let safetyMargin = 5000; // 5 seconds
         const reauth = () => {
-            // if(!authenticated){
-            //     socket.disconnect();
-            // }
             authenticated = false;
-            socket.emit('reauth');
+            socket.timeout(5000).emit('reauth');
             console.log(`${id}: must reauth`);
         }
         // initialize re-auth logic
@@ -71,10 +68,10 @@ module.exports = (app) => {
         console.log(`New client connected: ${id}`);
 
         // send all user sessions
-        setTimeout(async ()=>{
-            console.log(`${id}: sending all sessions`);
-            socket.emit("all-sessions", await chatService.getUserSessions(userId));
-        },100);
+        // setTimeout(async ()=>{
+        //     console.log(`${id}: sending all sessions`);
+        //     socket.emit("all-sessions", await chatService.getUserSessions(userId));
+        // },100);
 
         socket.on('send-all-sessions', async () =>{
             if(authenticated){
