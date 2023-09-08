@@ -89,6 +89,7 @@ async function deleteBlock(blockedContactId) {
     }
 }
 
+/** What a behemoth of data transformation */
 async function getAllFriendsOfUser(userId) {
     try {
         if (!userId) throw new Error('Missing argument');
@@ -97,16 +98,19 @@ async function getAllFriendsOfUser(userId) {
 
         const friendRequests = await FriendRequest.aggregate([
             {
+                // match where userId is either sender or recipient for friend request
                 $match: {
                     $or: [
                         { senderId: new mongoose.Types.ObjectId(userId) },
                         { recipientId: new mongoose.Types.ObjectId(userId) }
                     ],
+                    // exclude rejected requests
                     status: { $ne: 'rejected' },
                 }
             },
             {
                 $addFields: {
+                    // temporary field to hold the other party's ID
                     contactId: {
                         $cond: [
                             { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
@@ -114,6 +118,7 @@ async function getAllFriendsOfUser(userId) {
                             "$senderId"
                         ]
                     },
+                    // was the friend request sent or received?
                     friendRequest: {
                         $cond: [
                             { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
@@ -123,6 +128,7 @@ async function getAllFriendsOfUser(userId) {
                     }
                 }
             },
+            // get the user from contactId
             {
                 $lookup: {
                     from: 'users',
@@ -139,6 +145,7 @@ async function getAllFriendsOfUser(userId) {
                     'contact.password', 'contact.email', 'contact.createdAt',
                     'contact.updatedAt', 'contact.__v']
             },
+            // get blocked or blockedby contact info
             {
                 $lookup: {
                     from: 'blockedcontacts',
@@ -155,6 +162,7 @@ async function getAllFriendsOfUser(userId) {
                     as: 'userBlocked'
                 }
             },
+            // add flags for block/blocked by
             {
                 $addFields: {
                     blockedContact: {
@@ -165,6 +173,7 @@ async function getAllFriendsOfUser(userId) {
                     }
                 }
             },
+            // cleanup
             {
                 $project: {
                     recipientId: 0,
