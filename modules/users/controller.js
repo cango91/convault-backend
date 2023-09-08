@@ -131,7 +131,7 @@ const manualRefreshToken = async (req, res, next) => {
 const getIdFromUsername = async (username) =>{
     try {
         if(!username) throw new Error('Missing argument');
-        const user = await User.findOne({username: username.toLowerCase()});
+        const user = await User.findOne({username: username}).collation({strength: 2, locale: 'en'});
         if(!user) throw new Error('User not found');
         return user._id;
     } catch (error) {

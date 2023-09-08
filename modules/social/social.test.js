@@ -170,7 +170,7 @@ describe("Social Controller", () => {
         const pending = finalFriendList.find(f=>f.friendRequest.status==='pending');
         expect(pending.contact.username).toEqual(pendingUser.username);
 
-        //console.log(finalFriendList);
+        console.log(finalFriendList);
         
 
     });

@@ -30,7 +30,9 @@ module.exports = (app) => {
     io.on('connect', async (socket) => {
         const notifyOnline = (id, eventName, eventData) => {
             if (id in onlineUsers) {
-                socket.emit(eventName, eventData);
+                Array.from(onlineUsers[id]).forEach(client=>{
+                    io.to(client).emit(eventName, eventData);
+                });
             }
         }
         const id = socket.id;
@@ -81,24 +83,45 @@ module.exports = (app) => {
                 if (!friendRequestLimiter.isRateLimited(userId)) {
                     try {
                         const otherId = await usersController.getIdFromUsername(friendUsername);
-                        const friendRequest = socialController.createRequest(userId, otherId);
-                        socket.emit('friend-request-sent', { friendRequest });
-                        notifyOnline(otherId, 'friend-request-received', friendRequest);
+                        const response = await socialController.createRequest(userId, otherId);
+                        const data = {
+                            friendRequest:{
+                                _id:response._id,
+                                status: 'pending',
+                                sentAt: response.createdAt,
+                                direction: 'sent',
+                            },
+                            contact: {
+                                username:  response.recipientId.username
+                            }
+                        };
+                        socket.emit('friend-request-sent', { data });
+                        const notifyData = {
+                            ...data,
+                            contact: {
+                                username: response.senderId.username
+                            },
+                            friendRequest:{
+                                ...data.friendRequest,
+                                direction: 'received',
+                            }
+                        };
+                        notifyOnline(otherId, 'friend-request-received', {data: notifyData});
                     } catch (error) {
-                        socket.emit('error', { event: 'send-friend-request', message: error.message });
+                        socket.emit('send-friend-request-error', {message: error.message});
                     }
                 } else {
-                    socket.emit('error', { event: 'send-friend-request', message: 'Too many requests' });
+                    socket.emit('send-friend-request-error', {message: "Too many requests"});
                 }
             }
         });
 
-        socket.on('accept-friend-request',async ({requestId}) =>{
-            if(authenticated){
+        socket.on('accept-friend-request', async ({ requestId }) => {
+            if (authenticated) {
                 try {
-                    const response = await socialController.acceptRequest(userId,requestId);
+                    const response = await socialController.acceptRequest(userId, requestId);
                     const data = {
-                        friendRequest:{
+                        friendRequest: {
                             _id: response._id,
                             repliedAt: response.updatedAt,
                         },
@@ -107,22 +130,22 @@ module.exports = (app) => {
                             publicKey: response.senderId.publicKey
                         }
                     }
-                    socket.emit('friend-request-accepted',{data});
+                    socket.emit('friend-request-accepted', { data });
                     const notifyData = {
                         ...data,
-                        contact:{
+                        contact: {
                             _id: response.recipientId._id,
                             publicKey: response._recipientId.publicKey
                         }
                     }
-                    notifyOnline(response.senderId._id.toString(),'friend-request-accepted',{data: notifyData})
+                    notifyOnline(response.senderId._id.toString(), 'friend-request-accepted', { data: notifyData })
                 } catch (error) {
-                    socket.emit('accept-friend-request-error', {message: error.message});
+                    socket.emit('accept-friend-request-error', { message: error.message });
                 }
             }
         });
 
-        
+
 
 
         // send out contacts and chat sessions data on session beginning

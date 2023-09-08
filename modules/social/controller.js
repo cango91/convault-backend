@@ -21,7 +21,7 @@ async function createRequest(user, to) {
             senderId: fromUser,
             recipientId: toUser,
         });
-        return fr;
+        return await (await fr.populate('recipientId')).populate('senderId');
     } catch (error) {
         console.error(error);
         throw error;
