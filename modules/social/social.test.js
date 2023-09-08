@@ -118,12 +118,19 @@ describe("Social Controller", () => {
             email: "blockb@by.com",
             password: "BlockTh1$"
         });
+        const pendingUser = await User.create({
+            username: "Immapend",
+            email: 'user@pending.com',
+            password: '123456!!Ts'
+        })
         const cr1 = await frCtrl.createRequest(user1,user2);
         await cr1.reject();
         const cr2 = await frCtrl.createRequest(user1,blockingUser);
         await cr2.accept();
         const cr3 = await frCtrl.createRequest(blockedUser,user1);
         await cr3.accept();
+        
+
         const allFriendsBefore = await frCtrl.getAllFriendsOfUser(user1);
         expect(allFriendsBefore.length).toBe(2);
 
@@ -132,15 +139,20 @@ describe("Social Controller", () => {
 
         const allFriendsAfter = await frCtrl.getAllFriendsOfUser(user1);
         expect(allFriendsAfter.length).toBe(2);
-        console.log(allFriendsAfter);
-        const blockedContacts = allFriendsAfter.filter(friend => friend.blockedContact).map(x => x.contact);
+
+        const blockedContacts = allFriendsAfter.filter(friend => friend.blockedContact).map(x => x.contact._id);
         expect(blockedContacts.length).toBe(1);
         expect(blockedContacts[0]._id).toEqual(blockedUser._id);
         
-        const blockingContacts = allFriendsAfter.filter(f=> f.blockedByContact).map(f=>f.contact);
+        const blockingContacts = allFriendsAfter.filter(f=> f.blockedByContact).map(f=>f.contact._id);
         expect(blockingContacts[0]._id).toEqual(blockingUser._id);
 
+        await frCtrl.createRequest(user1,pendingUser);
+        const finalFriendList = await frCtrl.getAllFriendsOfUser(user1);
+        const pending = finalFriendList.find(f=>f.status==='pending');
+        expect(pending.contact._id).toEqual(pendingUser._id);
 
+        console.log(finalFriendList);
         
 
     });

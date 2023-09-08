@@ -107,19 +107,42 @@ async function getAllFriendsOfUser(userId) {
             },
             {
                 $addFields: {
-                    contact: {
+                    contactId: {
                         $cond: [
                             { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
                             "$recipientId",
                             "$senderId"
+                        ]
+                    },
+                    friendRequest: {
+                        $cond: [
+                            { $eq: ["$senderId", new mongoose.Types.ObjectId(userId)] },
+                            "sent",
+                            "received"
                         ]
                     }
                 }
             },
             {
                 $lookup: {
+                    from: 'users',
+                    localField: 'contactId',
+                    foreignField: '_id',
+                    as: 'contact'
+                }
+            },
+            {
+                $unwind: { path: '$contact' },
+            },
+            {
+                $unset: [
+                    'contact.password', 'contact.email', 'contact.createdAt',
+                    'contact.updatedAt', 'contact.__v']
+            },
+            {
+                $lookup: {
                     from: 'blockedcontacts',
-                    localField: 'contact',
+                    localField: 'contactId',
                     foreignField: 'blockerId',
                     as: 'blockedByUser'
                 }
@@ -127,29 +150,30 @@ async function getAllFriendsOfUser(userId) {
             {
                 $lookup: {
                     from: 'blockedcontacts',
-                    localField: 'contact',
+                    localField: 'contactId',
                     foreignField: 'blockedId',
                     as: 'userBlocked'
                 }
             },
             {
-                $addFields:{
+                $addFields: {
                     blockedContact: {
-                        $cond: [{$gt: [{$size: "$userBlocked"}, 0]}, true, false]
+                        $cond: [{ $gt: [{ $size: "$userBlocked" }, 0] }, true, false]
                     },
-                    blockedByContact:{
-                        $cond: [{$gt: [{$size: "$blockedByUser"}, 0]}, true, false]
+                    blockedByContact: {
+                        $cond: [{ $gt: [{ $size: "$blockedByUser" }, 0] }, true, false]
                     }
                 }
-            },          
+            },
             {
                 $project: {
                     recipientId: 0,
                     senderId: 0,
-                    status: 0,
                     _id: 0,
                     blockedByUser: 0,
-                    userBlocked: 0
+                    userBlocked: 0,
+                    contactId: 0,
+                    __v: 0,
                 }
             }
         ]);
