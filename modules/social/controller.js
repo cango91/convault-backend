@@ -8,7 +8,7 @@ async function createRequest(user, to) {
         if (!user || !to) throw new Error('Missing users');
         const fromUser = await User.findById(user);
         const toUser = await User.findById(to);
-        if (!fromUser || !toUser) throw new Error('Invalid user');
+        if (!fromUser || !toUser || !toUser.publicKey || !fromUser.publicKey) throw new Error('Invalid user');
         const existing = await FriendRequest.findOne(
             {
                 $or: [{
@@ -32,7 +32,7 @@ async function acceptRequest(recipientId, requestId) {
     try {
         const fr = await FriendRequest.findById(requestId);
         if (!fr) throw new Error('Friend Request not found');
-        if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
+        if (!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
         const accepted = await fr.accept();
         return await (await accepted.populate("senderId")).populate("recipientId");
     } catch (error) {
@@ -44,7 +44,7 @@ async function rejectRequest(recipientId, requestId) {
     try {
         const fr = await FriendRequest.findById(requestId);
         if (!fr) throw new Error('Friend Request not found');
-        if(!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
+        if (!fr.recipientId.equals(recipientId)) throw new Error("Not Allowed");
         const rejected = await fr.reject();
         return await (await rejected.populate("senderId")).populate("recipientId");
     } catch (error) {
@@ -55,8 +55,8 @@ async function rejectRequest(recipientId, requestId) {
 
 async function userAcceptsRequestOf(userId, senderId) {
     try {
-        const fr = await FriendRequest.findOne({senderId, recipientId: userId, status: 'pending'});
-        if(!fr) throw new Error('Friend Request not found');
+        const fr = await FriendRequest.findOne({ senderId, recipientId: userId, status: 'pending' });
+        if (!fr) throw new Error('Friend Request not found');
         return await fr.accept();
     } catch (error) {
         console.error(error);
@@ -66,8 +66,8 @@ async function userAcceptsRequestOf(userId, senderId) {
 
 async function userRejectsRequestOf(userId, senderId) {
     try {
-        const fr = await FriendRequest.findOne({senderId, recipientId: userId, status: 'pending'});
-        if(!fr) throw new Error('Friend Request not found');
+        const fr = await FriendRequest.findOne({ senderId, recipientId: userId, status: 'pending' });
+        if (!fr) throw new Error('Friend Request not found');
         return await fr.reject();
     } catch (error) {
         console.error(error);

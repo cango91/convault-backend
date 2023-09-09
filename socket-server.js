@@ -124,6 +124,7 @@ module.exports = (app) => {
                         friendRequest: {
                             _id: response._id,
                             repliedAt: response.updatedAt,
+                            status: 'accepted',
                         },
                         contact: {
                             _id: response.senderId._id,
@@ -135,10 +136,10 @@ module.exports = (app) => {
                         ...data,
                         contact: {
                             _id: response.recipientId._id,
-                            publicKey: response._recipientId.publicKey
+                            publicKey: response.recipientId.publicKey
                         }
-                    }
-                    notifyOnline(response.senderId._id.toString(), 'friend-request-accepted', { data: notifyData })
+                    };
+                    notifyOnline(response.senderId._id.toString(), 'friend-request-accepted', { data: notifyData });
                 } catch (error) {
                     socket.emit('accept-friend-request-error', { message: error.message });
                 }
