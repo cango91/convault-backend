@@ -5,11 +5,18 @@ const mongoose = require('mongoose');
 const AsyncLock = require('async-lock');
 const lock = new AsyncLock();
 
+/** Generate a key unique for each pair of users by concating their usernames/ids after sorting */
+const generatePairKey = (...users) => {
+    const sortedUsers = [users[0], users[1]].sort();
+    return sortedUsers.join(':');
+}
+
 /** Deletes a thread starting from head message (non-ACID)
  *  (in production, use a replica set and enable transactions for atomicity of operation)
  */
 const deleteThread = async (chatSession) => {
-    return await lock.acquire(chatSession._id, async () => {
+    const key = generatePairKey(chatSession.user1, chatSession.user2);
+    return await lock.acquire(key, async () => {
         // const session = await mongoose.startSession();
         // session.startTransaction();
         try {
@@ -34,7 +41,7 @@ const deleteThread = async (chatSession) => {
 
 /** Fetch all sessions with active or archived status for userId */
 const fetchUserSessions = async (userId) => {
-    userId = typeof(userId) === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    userId = typeof (userId) === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
     return await ChatSession.find({
         $or: [
             { user1: userId, user1Status: { $ne: 'deleted' } },
@@ -57,7 +64,7 @@ const calculateUnreadCount = async (session, userId) => {
     return unreadCount;
 }
 
-const getMessageDate = async(messageId)=>{
+const getMessageDate = async (messageId) => {
     return (await Message.findById(messageId)).createdAt;
 }
 
@@ -78,9 +85,65 @@ const getUserSessions = async (userId) => {
 
 }
 
+const createMessage = async (recipientId, senderId, content, status = "sent", previous = null, save = false) => {
+    try {
+        const message = new Message({
+            recipientId,
+            senderId,
+            encryptedContent: content,
+            status,
+            previous
+        });
+        if (save) await message.save();
+        return message;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+const createSession = async (user1, user2, head, save = false) => {
+    const session = new ChatSession({
+        user1,
+        user2,
+        head
+    });
+    if (save) await session.save();
+}
+
+/** Send message. Updates session head (or creates one) */
+const sendMessage = async (recipientId, senderId, content) => {
+    return await lock.acquire(generatePairKey(recipientId, senderId), async () => {
+        try {
+            const message = await createMessage(recipientId, senderId, content);
+            // check if a session exists between the users
+            let session = await ChatSession.findOne({
+                $or: [
+                    { user1: recipientId, user2: senderId },
+                    { user2: recipientId, user1: senderId }],
+            });
+            if (session) {
+                session.decryptHead();
+                message.previous = session.head;
+                session.head = message._id;
+            } else {
+                session = await createSession(recipientId, sendMessage, message._id);
+            }
+            await message.save();
+            await session.save();
+            return {message, session};
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    })
+
+}
+
 module.exports = {
     deleteThread,
     fetchUserSessions,
     calculateUnreadCount,
     getUserSessions,
+    sendMessage,
 }

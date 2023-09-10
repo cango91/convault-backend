@@ -6,6 +6,10 @@ const FR = require('./models/friendRequest');
 const BC = require('./models/blockedContacts');
 const frCtrl = require('./controller');
 let user1, user2;
+const publicKey = `-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvfAcQjTLKwQI9kw/5j+Yym+tpUgeXrVkn1cWmF8lFqM/TL6oISOnciS/vSCJbXKk41T6AR64jgcq+9Vqnh7ghLWULW81ul6v4r+D0vjQccHPUU39jQe+VRYeU/7YIOInapkLb2EfrZy2vKKvKXZPoX9km973ST5ke0jdg7DNbkWHuv/jwEGGkMq3bROYDkPlLwN/6kt5PUZmTE/1/jHwpfkT5THSjeqSc4atu7lbpv8wbAxDCSx17tBvjaaZZJIU8brEEYVAzMWAqm22W8TUJw7LKdXfq9OIaMng4mLQ27hjlUXpWlcw26Db/4aqW8wGZi/+Tn7z/0Dme0aAA1FbpLyofaw4f9wG+k70BuSyEkx1HdsDFwo2sn111mkDvvRwjnLiuqS584j8acRC1X80nIbDdxclc+DKLTiwnR09MxcUiQEfF0r4hRzzK2303sMn9xdbaZfzarcc+LArHEPtat3XIXeojyWoGudG1phaiVyRd4Yh48mi/uG1v1TMs9jBVnUpl8ti4zFXhTEdBTFsrOqeqoRlCo2cbbOdkOlao+UOGHBgyWCCrptfaTAtzzzWo7aDdVhhYnRUmxRb1o+IFLlhcgu4nKzzC0z+DlW79hUUBX7kiLYwJjX3BOArlyD+N0SVzV8BSwN+YXk5eg9kUWJuY8QjOzD7iTtbyPsCKJkCAwEAAQ==
+-----END PUBLIC KEY-----`;
+
 
 beforeAll(async () => {
     await mongoose.connect(global.__MONGO_URI__, { useNewUrlParser: true });
@@ -13,11 +17,13 @@ beforeAll(async () => {
         username: 'usessr1',
         email: 'maaaaail1@test.com',
         password: 'strongPassword1!',
+        publicKey
     });
     user2 = await User.create({
         username: 'usessr2',
         email: 'maaail2@test.com',
         password: 'alsoVeryStrongPassword!2',
+        publicKey
     });
 });
 
@@ -53,7 +59,8 @@ describe("Social Controller", () => {
         const user3 = await User.create({
             username: 'uzer3',
             email: 'mail3@test.com',
-            password: 'yetAnotherStrongPassword!3'
+            password: 'yetAnotherStrongPassword!3',
+            publicKey
         });
 
         const fr1 = await frCtrl.createRequest(user1, user3);
@@ -79,7 +86,8 @@ describe("Social Controller", () => {
         const user3 = await User.create({
             username: 'Yetuzer3',
             email: 'maisl3@test.com',
-            password: 'yestAnotherStrongPassword!3'
+            password: 'yestAnotherStrongPassword!3',
+            publicKey
         });
         const fr1 = await FR.create({senderId:user1,recipientId:user2});
         await expect(frCtrl.acceptRequest(user3, fr1._id )).rejects.toThrow();
@@ -129,17 +137,20 @@ describe("Social Controller", () => {
         const blockedUser = await User.create({
             username: "blockedUser",
             email: 'somemail@other.com',
-            password: 'veryStr0ng!pass'
+            password: 'veryStr0ng!pass',
+            publicKey
         });
         const blockingUser = await User.create({
             username: "IbLockEvery0ne",
             email: "blockb@by.com",
-            password: "BlockTh1$"
+            password: "BlockTh1$",
+            publicKey
         });
         const pendingUser = await User.create({
             username: "Immapend",
             email: 'user@pending.com',
-            password: '123456!!Ts'
+            password: '123456!!Ts',
+            publicKey
         })
         const cr1 = await frCtrl.createRequest(user1,user2);
         await cr1.reject();

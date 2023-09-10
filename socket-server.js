@@ -28,15 +28,23 @@ module.exports = (app) => {
     const onlineUsers = {};
 
     io.on('connect', async (socket) => {
+        const id = socket.id;
+        const userId = socket.decoded.user._id;
+
         const notifyOnline = (id, eventName, eventData) => {
             if (id in onlineUsers) {
-                Array.from(onlineUsers[id]).forEach(client=>{
+                Array.from(onlineUsers[id]).forEach(client => {
                     io.to(client).emit(eventName, eventData);
                 });
             }
         }
-        const id = socket.id;
-        const userId = socket.decoded.user._id;
+        const emitSynced = (eventName, eventData) => {
+            if (!userId in onlineUsers) return;
+            Array.from(onlineUsers[userId]).forEach(client => {
+                io.to(client).emit(eventName, eventData);
+            });
+        }
+
         let authenticated = true;
         if (!onlineUsers[userId]) {
             onlineUsers[userId] = new Set();
@@ -85,33 +93,34 @@ module.exports = (app) => {
                         const otherId = await usersController.getIdFromUsername(friendUsername);
                         const response = await socialController.createRequest(userId, otherId);
                         const data = {
-                            friendRequest:{
-                                _id:response._id,
+                            friendRequest: {
+                                _id: response._id,
                                 status: 'pending',
                                 sentAt: response.createdAt,
                                 direction: 'sent',
                             },
                             contact: {
-                                username:  response.recipientId.username
+                                username: response.recipientId.username
                             }
                         };
-                        socket.emit('friend-request-sent', { data });
+                        //socket.emit('friend-request-sent', { data });
+                        emitSynced('friend-request-sent', { data });
                         const notifyData = {
                             ...data,
                             contact: {
                                 username: response.senderId.username
                             },
-                            friendRequest:{
+                            friendRequest: {
                                 ...data.friendRequest,
                                 direction: 'received',
                             }
                         };
-                        notifyOnline(otherId, 'friend-request-received', {data: notifyData});
+                        notifyOnline(otherId, 'friend-request-received', { data: notifyData });
                     } catch (error) {
-                        socket.emit('send-friend-request-error', {message: error.message});
+                        socket.emit('send-friend-request-error', { message: error.message });
                     }
                 } else {
-                    socket.emit('send-friend-request-error', {message: "Too many requests"});
+                    socket.emit('send-friend-request-error', { message: "Too many requests" });
                 }
             }
         });
@@ -131,7 +140,8 @@ module.exports = (app) => {
                             publicKey: response.senderId.publicKey
                         }
                     }
-                    socket.emit('friend-request-accepted', { data });
+                    // socket.emit('friend-request-accepted', { data });
+                    emitSynced('friend-request-accepted', { data });
                     const notifyData = {
                         ...data,
                         contact: {
@@ -143,6 +153,16 @@ module.exports = (app) => {
                 } catch (error) {
                     socket.emit('accept-friend-request-error', { message: error.message });
                 }
+            }
+        });
+
+        socket.on('send-message', async ({recipient, content}) => {
+            try {
+                const {message, session} = await chatService.sendMessage(userId, recipient,content);
+                emitSynced('message-sent',{data: {message, session}});
+                notifyOnline(recipient,'message-received',{data: {message,session}});
+            } catch (error) {
+                socket.emit('send-message-error',{message: error.message, data:{recipient,content}});
             }
         });
 
