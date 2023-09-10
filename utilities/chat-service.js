@@ -59,6 +59,7 @@ const calculateUnreadCount = async (session, userId) => {
             break;
         }
         if (msg.status !== 'read') unreadCount++;
+        else break;
         msg = msg.previous ? await Message.findById(msg.previous) : null;
     }
     return unreadCount;
