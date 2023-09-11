@@ -5,6 +5,13 @@ const messageSchema = new mongoose.Schema({
     encryptedContent: {
         type: String
     },
+    /** Icebox: PFS */
+    ephemeralKey: {
+        type: String,
+    },
+    key:{
+        type:String,
+    },
     status: {
         type: String,
         enum: ['sent', 'delivered', 'read', 'deleted'],

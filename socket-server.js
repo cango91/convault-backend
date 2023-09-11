@@ -158,8 +158,24 @@ module.exports = (app) => {
             }
         });
 
+        socket.on('send-encrypted', async ({recipient, encryptedContent, symmetricKey})=>{
+            try {
+                console.log('i got you man')
+                if(!encryptedContent.replace(/\s+/g,'') || !recipient || !symmetricKey) throw new Error('Missing required data.');
+                if(typeof(recipient) !== 'string' || typeof(encryptedContent) !== 'string' || typeof(symmetricKey) !== 'string')
+                    throw new TypeError();
+                const {message,session} = await chatService.sendEncrypted(userId, recipient, encryptedContent, symmetricKey);
+                emitSynced('message-sent',{data: {message,session}});
+                notifyOnline(recipient,'message-received', {data: {message, session}});
+            } catch (error) {
+                console.log(error);
+                socket.emit('send-message-error',{message: error.message, data:{recipient,encryptedContent, symmetricKey}});
+            }
+        });
+
         socket.on('send-message', async ({recipient, content}) => {
             try {
+                //throw new Error('Not allowed');
                 if(!content.replace(/\s+/g,'')) throw new Error('Empty message');
                 content = content.replace(/^\s+|\s+$/g, '')
                 const {message, session} = await chatService.sendMessage(recipient, userId,content);

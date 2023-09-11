@@ -174,11 +174,42 @@ const getMessagesFrom = async (userId, fromId, session, count = 50) => {
     }
 }
 
+const sendEncrypted =  async (senderId,recipientId,content,key) =>{
+    return await lock.acquire(generatePairKey(recipientId, senderId), async () => {
+        try {
+            let message = await createMessage(recipientId, senderId, content);
+            message.symmetricKey = key;
+            // check if a session exists between the users
+            let session = await ChatSession.findOne({
+                $or: [
+                    { user1: recipientId, user2: senderId },
+                    { user2: recipientId, user1: senderId }],
+            });
+            if (session) {
+                session.decryptHead();
+                message.previous = session.head;
+                session.head = message._id;
+            } else {
+                session = await createSession(senderId, recipientId, message._id);
+            }
+            await message.save();
+            await session.save();
+            session.decryptHead();
+            message = await Message.findById(message._id);
+            return { message, session };
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    });
+}
+
 module.exports = {
     deleteThread,
     fetchUserSessions,
     calculateUnreadCount,
     getUserSessions,
     sendMessage,
+    sendEncrypted,
     getMessagesFrom,
 }
