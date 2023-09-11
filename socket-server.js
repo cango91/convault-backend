@@ -1,6 +1,6 @@
 const http = require('http');
 const socketIO = require('socket.io');
-const validator = require('validator');
+const experimentalSanitize = require('./middleware/socket/sanitize.experimental');
 const usersController = require('./modules/users/controller');
 const tokenService = require('./utilities/token-service');
 const chatService = require('./utilities/chat-service');
@@ -23,6 +23,8 @@ module.exports = (app) => {
     io.use(handshake);
     // middleware for sanitizing user data (strings)
     io.use(sanitize);
+    //io.use(experimentalSanitize);
+    //io.use(require('./middleware/socket/testing'));
 
     // track online users' ids with client id sets
     const onlineUsers = {};
