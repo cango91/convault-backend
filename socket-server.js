@@ -158,11 +158,22 @@ module.exports = (app) => {
 
         socket.on('send-message', async ({recipient, content}) => {
             try {
-                const {message, session} = await chatService.sendMessage(userId, recipient,content);
+                const {message, session} = await chatService.sendMessage(recipient, userId,content);
                 emitSynced('message-sent',{data: {message, session}});
                 notifyOnline(recipient,'message-received',{data: {message,session}});
             } catch (error) {
                 socket.emit('send-message-error',{message: error.message, data:{recipient,content}});
+            }
+        });
+
+        socket.on('get-messages', async ({from, session, count})=>{
+            count = Math.min(Math.abs(count || 50));
+            try {
+                const messages = await chatService.getMessagesFrom(userId,from, session, count);
+                emitSynced('messages-retrieved',{messages, session, from});
+            } catch (error) {
+                console.error(error);
+                socket.emit('get-messages-error',{message: error.message, data: {from, session, count}});
             }
         });
 

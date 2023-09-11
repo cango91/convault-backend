@@ -72,18 +72,23 @@ const getMessageDate = async (messageId) => {
 /** Fetch the active and archived sessions of a user with unread messages count */
 const getUserSessions = async (userId) => {
     try {
+        const ret = [];
         const sessions = await fetchUserSessions(userId);
         for (let session of sessions) {
             session.decryptHead();
-            session.unreadCount = await calculateUnreadCount(session, userId);
-            session.lastMessageDate = await getMessageDate(session.head);
+            const unread = await calculateUnreadCount(session, userId);
+            const lastDate = await getMessageDate(session.head);
+            session = session.toObject();
+            session.unreadCount = unread;
+            session.lastMessageDate = lastDate;
+            ret.push(session);
+            
         }
-        return sessions;
+        return ret;
     } catch (error) {
         console.error(error);
         throw error;
     }
-
 }
 
 const createMessage = async (recipientId, senderId, content, status = "sent", previous = null, save = false) => {
@@ -110,13 +115,14 @@ const createSession = async (user1, user2, head, save = false) => {
         head
     });
     if (save) await session.save();
+    return session;
 }
 
 /** Send message. Updates session head (or creates one) */
 const sendMessage = async (recipientId, senderId, content) => {
     return await lock.acquire(generatePairKey(recipientId, senderId), async () => {
         try {
-            const message = await createMessage(recipientId, senderId, content);
+            let message = await createMessage(recipientId, senderId, content);
             // check if a session exists between the users
             let session = await ChatSession.findOne({
                 $or: [
@@ -128,17 +134,44 @@ const sendMessage = async (recipientId, senderId, content) => {
                 message.previous = session.head;
                 session.head = message._id;
             } else {
-                session = await createSession(recipientId, sendMessage, message._id);
+                session = await createSession(senderId, recipientId, message._id);
             }
             await message.save();
             await session.save();
-            return {message, session};
+            session.decryptHead();
+            message = await Message.findById(message._id);
+            return { message, session };
         } catch (error) {
             console.error(error);
             throw error;
         }
-    })
+    });
+}
 
+const getMessagesFrom = async (userId, fromId, session, count = 50) => {
+    try {
+        const first = await Message.findById(fromId);
+        if(!first) throw new Error('Message not found');
+        if(!first.recipientId.equals(userId) && !first.senderId.equals(userId)) throw new Error('Invalid message');
+        const sess = await ChatSession.findById(session);
+        if(!sess) throw new Error('Invalid session');
+        const ret = [first];
+        let idx = 1;
+        let msg = first;
+        while(first && idx<count){
+            msg = await Message.findById(msg.previous);
+            if(msg){
+                ret.push(msg);
+                idx++;
+            }else{
+                break;
+            }
+        }
+        return ret;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
 }
 
 module.exports = {
@@ -147,4 +180,5 @@ module.exports = {
     calculateUnreadCount,
     getUserSessions,
     sendMessage,
+    getMessagesFrom,
 }
