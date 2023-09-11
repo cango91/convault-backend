@@ -160,6 +160,8 @@ module.exports = (app) => {
 
         socket.on('send-message', async ({recipient, content}) => {
             try {
+                if(!content.replace(/\s+/g,'')) throw new Error('Empty message');
+                content = content.replace(/^\s+|\s+$/g, '')
                 const {message, session} = await chatService.sendMessage(recipient, userId,content);
                 emitSynced('message-sent',{data: {message, session}});
                 notifyOnline(recipient,'message-received',{data: {message,session}});
