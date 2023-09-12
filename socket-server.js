@@ -158,7 +158,7 @@ module.exports = (app) => {
                 }
             }
         });
-
+        // send an encrypted message. If the sender sends a key to store, store in KeyStore
         socket.on('send-encrypted', async ({ recipient, encryptedContent, symmetricKey, storedKey }) => {
             try {
                 if (!encryptedContent.replace(/\s+/g, '') || !recipient || !symmetricKey) throw new Error('Missing required data.');
@@ -179,7 +179,7 @@ module.exports = (app) => {
                 socket.emit('send-message-error', { message: error.message, data: { recipient, encryptedContent, symmetricKey } });
             }
         });
-
+        // no messaging without e2e
         socket.on('send-message', async ({ recipient, content }) => {
             try {
                 throw new Error('Not allowed');
@@ -217,12 +217,15 @@ module.exports = (app) => {
             }
         });
 
-        socket.on('set-key', async ({ key, value }) => {
+        // Set a key for user. If provided invoke callback
+        socket.on('set-key', async ({ key, value },callback) => {
             if (authenticated) {
                 try {
                     await keyService.set(userId, key, value);
+                    if(callback) callback();
                 } catch (error) {
                     socket.emit('set-key-error', { message: error.message, data: { key, value } });
+                    if(callback) callback({ message: error.message, data: { key, value } });
                 }
             }
         });
@@ -244,10 +247,8 @@ module.exports = (app) => {
         }
 
 
-
         socket.on('disconnect', () => {
             console.log(`Client disconnected: ${id}`);
-            //onlineUsers.delete(userId);
             onlineUsers[userId].delete(id);
             if (!onlineUsers[userId].size) delete onlineUsers[userId];
             clearTimeout(t);
