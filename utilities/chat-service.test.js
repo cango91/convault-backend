@@ -109,11 +109,12 @@ describe("Chat Service", ()=>{
     it("should get all sessions for user with unread counts", async ()=>{
         const user1Sessions = await chatService.getUserSessions(user1._id);
         expect(user1Sessions.length).toEqual(2);
-        expect(user1Sessions.filter(s => s.equals(session)).map(s => s.unreadCount)[0]).toBe(0);
-        expect(user1Sessions.filter(s => s.equals(otherSession)).map(s => s.unreadCount)[0]).toBe(0);
+        console.log(user1Sessions);
+        expect(user1Sessions.filter(s => session._id.equals(s._id)).map(s => s.unreadCount)[0]).toBe(0);
+        expect(user1Sessions.filter(s => otherSession._id.equals(s._id)).map(s => s.unreadCount)[0]).toBe(0);
         const user2Sessions = await chatService.getUserSessions(user2._id.toString());
         expect(user2Sessions.length).toEqual(1);
-        expect(user2Sessions.filter(s => s.equals(session)).map(s => s.unreadCount)[0]).toBe(2);
+        expect(user2Sessions.filter(s => session._id.equals(s._id)).map(s => s.unreadCount)[0]).toBe(2);
         expect(user1Sessions[0].lastMessageDate).toBeInstanceOf(Date);
     })
 

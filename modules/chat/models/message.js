@@ -59,7 +59,7 @@ messageSchema.pre('save', function (next) {
 messageSchema.post('save', async function (doc, next) {
     if (!doc._wasModified) return next();
     if (doc.isDeletedRecipient && doc.isDeletedSender) {
-        await doc.updateOne({ encryptedContent: "", status: "deleted" });
+        await doc.updateOne({ encryptedContent: "", symmetricKey:"", status: "deleted" });
     }
     next();
 });
