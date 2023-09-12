@@ -9,7 +9,7 @@ const messageSchema = new mongoose.Schema({
     ephemeralKey: {
         type: String,
     },
-    key:{
+    symmetricKey:{
         type:String,
     },
     status: {
@@ -73,10 +73,6 @@ messageSchema.pre('save', function (next) {
         }
     }
     next();
-});
-
-messageSchema.post('find',function(docs){
-    console.log('h,,,h,h,,hh');
 });
 
 messageSchema.post('findOne', function (doc) {

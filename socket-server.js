@@ -8,6 +8,7 @@ const socialController = require('./modules/social/controller');
 const SlidingWindowRateLimiter = require('./utilities/sliding-window-rate-limiter');
 const handshake = require('./middleware/socket/handshake');
 const sanitize = require('./middleware/socket/sanitize');
+const keyService = require('./utilities/key-service');
 
 module.exports = (app) => {
     const server = http.createServer(app);
@@ -22,7 +23,7 @@ module.exports = (app) => {
     // middleware for initial jwt handshake
     io.use(handshake);
     // middleware for sanitizing user data (strings)
-    io.use(sanitize);
+    //io.use(sanitize);
     //io.use(experimentalSanitize);
     //io.use(require('./middleware/socket/testing'));
 
@@ -158,42 +159,71 @@ module.exports = (app) => {
             }
         });
 
-        socket.on('send-encrypted', async ({recipient, encryptedContent, symmetricKey})=>{
+        socket.on('send-encrypted', async ({ recipient, encryptedContent, symmetricKey, storedKey }) => {
             try {
-                console.log('i got you man')
-                if(!encryptedContent.replace(/\s+/g,'') || !recipient || !symmetricKey) throw new Error('Missing required data.');
-                if(typeof(recipient) !== 'string' || typeof(encryptedContent) !== 'string' || typeof(symmetricKey) !== 'string')
+                if (!encryptedContent.replace(/\s+/g, '') || !recipient || !symmetricKey) throw new Error('Missing required data.');
+                if (typeof (recipient) !== 'string' || typeof (encryptedContent) !== 'string' || typeof (symmetricKey) !== 'string')
                     throw new TypeError();
-                const {message,session} = await chatService.sendEncrypted(userId, recipient, encryptedContent, symmetricKey);
-                emitSynced('message-sent',{data: {message,session}});
-                notifyOnline(recipient,'message-received', {data: {message, session}});
+                const { message, session } = await chatService.sendEncrypted(userId, recipient, encryptedContent, symmetricKey);
+                emitSynced('message-sent', { data: { message, session } });
+                notifyOnline(recipient, 'message-received', { data: { message, session } });
+                if(storedKey){
+                    try {
+                        await keyService.set(userId,symmetricKey,storedKey);
+                    } catch (error) {
+                        socket.emit('set-key-error',{message: error.message, data:{key:symmetricKey,value:storedKey}});
+                    }
+                }
             } catch (error) {
                 console.log(error);
-                socket.emit('send-message-error',{message: error.message, data:{recipient,encryptedContent, symmetricKey}});
+                socket.emit('send-message-error', { message: error.message, data: { recipient, encryptedContent, symmetricKey } });
             }
         });
 
-        socket.on('send-message', async ({recipient, content}) => {
+        socket.on('send-message', async ({ recipient, content }) => {
             try {
-                //throw new Error('Not allowed');
-                if(!content.replace(/\s+/g,'')) throw new Error('Empty message');
+                throw new Error('Not allowed');
+                if (!content.replace(/\s+/g, '')) throw new Error('Empty message');
                 content = content.replace(/^\s+|\s+$/g, '')
-                const {message, session} = await chatService.sendMessage(recipient, userId,content);
-                emitSynced('message-sent',{data: {message, session}});
-                notifyOnline(recipient,'message-received',{data: {message,session}});
+                const { message, session } = await chatService.sendMessage(recipient, userId, content);
+                emitSynced('message-sent', { data: { message, session } });
+                notifyOnline(recipient, 'message-received', { data: { message, session } });
             } catch (error) {
-                socket.emit('send-message-error',{message: error.message, data:{recipient,content}});
+                socket.emit('send-message-error', { message: error.message, data: { recipient, content } });
             }
         });
 
-        socket.on('get-messages', async ({from, session, count})=>{
+        socket.on('get-messages', async ({ from, session, count }) => {
             count = Math.min(Math.abs(count || 50));
             try {
-                const messages = await chatService.getMessagesFrom(userId,from, session, count);
-                emitSynced('messages-retrieved',{messages, session, from});
+                const messages = await chatService.getMessagesFrom(userId, from, session, count);
+                emitSynced('messages-retrieved', { messages, session, from });
             } catch (error) {
                 console.error(error);
-                socket.emit('get-messages-error',{message: error.message, data: {from, session, count}});
+                socket.emit('get-messages-error', { message: error.message, data: { from, session, count } });
+            }
+        });
+
+        socket.on('get-key', async ({ key }, callback) => {
+            if (authenticated) {
+                try {
+                    const data = await keyService.get(userId, key);
+                    callback('got-key', data);
+                } catch (error) {
+                    callback('get-key-error', { message: error.message, data: { key } });
+                }
+            }else{
+                callback('not-authorized',{message: 'You are not authorized to perform this action'});
+            }
+        });
+
+        socket.on('set-key', async ({ key, value }) => {
+            if (authenticated) {
+                try {
+                    await keyService.set(userId, key, value);
+                } catch (error) {
+                    socket.emit('set-key-error', { message: error.message, data: { key, value } });
+                }
             }
         });
 
