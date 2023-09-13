@@ -9,8 +9,8 @@ const messageSchema = new mongoose.Schema({
     ephemeralKey: {
         type: String,
     },
-    symmetricKey:{
-        type:String,
+    symmetricKey: {
+        type: String,
     },
     status: {
         type: String,
@@ -42,8 +42,8 @@ const messageSchema = new mongoose.Schema({
         type: String,
         ref: 'Message'
     },
-    createdAt: {type: mongoose.Schema.Types.Mixed},
-    updatedAt: {type: mongoose.Schema.Types.Mixed},
+    createdAt: { type: mongoose.Schema.Types.Mixed },
+    updatedAt: { type: mongoose.Schema.Types.Mixed },
 
 },
     {
@@ -59,7 +59,7 @@ messageSchema.pre('save', function (next) {
 messageSchema.post('save', async function (doc, next) {
     if (!doc._wasModified) return next();
     if (doc.isDeletedRecipient && doc.isDeletedSender) {
-        await doc.updateOne({ encryptedContent: "", symmetricKey:"", status: "deleted" });
+        await doc.updateOne({ encryptedContent: "", symmetricKey: "", status: "deleted" });
     }
     next();
 });
@@ -85,9 +85,12 @@ messageSchema.post('findOne', function (doc) {
     }
 });
 
-messageSchema.pre("save", function(next){
-    if(this.isNew)
+messageSchema.pre("save", function (next) {
+    if (this.isNew) {
         this.createdAt = cryptoService.encrypt((new Date()).toString());
+    } else if (this.isModified('createdAt')) {
+        this.createdAt = cryptoService.encrypt(this.createdAt.toString());
+    }
     this.updatedAt = cryptoService.encrypt((new Date()).toString());
     next();
 });

@@ -161,6 +161,10 @@ const getMessagesFrom = async (userId, fromId, session, count = 50) => {
         while(first && idx<count){
             msg = await Message.findById(msg.previous);
             if(msg){
+                if((msg.senderId.equals(userId) && msg.isDeletedSender)
+                ||(msg.recipientId.equals(userId)&& msg.isDeletedRecipient)){
+                    msg.encryptedContent = "";
+                }
                 ret.push(msg);
                 idx++;
             }else{
@@ -204,6 +208,27 @@ const sendEncrypted =  async (senderId,recipientId,content,key) =>{
     });
 }
 
+const deleteMessage = async (userId, messageId, both = false) =>{
+    try {
+        const message = await Message.findById(messageId);
+        if(!message || (!message.senderId.equals(userId) && !message.recipientId.equals(userId))) throw new Error('Invalid message');
+        const deletedBy = message.senderId.equals(userId) ? 'Sender' : 'Recipient';
+        if(both && deletedBy === 'Recipient') throw new Error('Not allowed');
+        if(!both){
+            message[`isDeleted${deletedBy}`] = true;
+        }else{
+            message.isDeletedRecipient = true;
+            message.isDeletedSender = true;
+            message.status = 'deleted';
+        }
+        await message.save();
+        return message[`${deletedBy==='Sender' ? 'recipient' : 'sender'}Id`]._id;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
 module.exports = {
     deleteThread,
     fetchUserSessions,
@@ -212,4 +237,5 @@ module.exports = {
     sendMessage,
     sendEncrypted,
     getMessagesFrom,
+    deleteMessage,
 }

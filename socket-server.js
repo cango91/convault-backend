@@ -167,11 +167,11 @@ module.exports = (app) => {
                 const { message, session } = await chatService.sendEncrypted(userId, recipient, encryptedContent, symmetricKey);
                 emitSynced('message-sent', { data: { message, session } });
                 notifyOnline(recipient, 'message-received', { data: { message, session } });
-                if(storedKey){
+                if (storedKey) {
                     try {
-                        await keyService.set(userId,symmetricKey,storedKey);
+                        await keyService.set(userId, symmetricKey, storedKey);
                     } catch (error) {
-                        socket.emit('set-key-error',{message: error.message, data:{key:symmetricKey,value:storedKey}});
+                        socket.emit('set-key-error', { message: error.message, data: { key: symmetricKey, value: storedKey } });
                     }
                 }
             } catch (error) {
@@ -193,6 +193,19 @@ module.exports = (app) => {
             }
         });
 
+        socket.on('delete-message', async ({ id, both = false }) => {
+            try {
+                const other = await chatService.deleteMessage(userId, id, both);
+                emitSynced('message-deleted', { id, other });
+                if (both) {
+                    notifyOnline(other, 'message-deleted', { id, other: userId });
+                }
+            } catch (error) {
+                socket.emit('delete-message-error', { message: error.message, data: { id, both } });
+            }
+        });
+
+
         socket.on('get-messages', async ({ from, session, count }) => {
             count = Math.min(Math.abs(count || 50));
             try {
@@ -212,20 +225,20 @@ module.exports = (app) => {
                 } catch (error) {
                     callback('get-key-error', { message: error.message, data: { key } });
                 }
-            }else{
-                callback('not-authorized',{message: 'You are not authorized to perform this action'});
+            } else {
+                callback('not-authorized', { message: 'You are not authorized to perform this action' });
             }
         });
 
         // Set a key for user. If provided invoke callback
-        socket.on('set-key', async ({ key, value },callback) => {
+        socket.on('set-key', async ({ key, value }, callback) => {
             if (authenticated) {
                 try {
                     await keyService.set(userId, key, value);
-                    if(callback) callback();
+                    if (callback) callback();
                 } catch (error) {
                     socket.emit('set-key-error', { message: error.message, data: { key, value } });
-                    if(callback) callback({ message: error.message, data: { key, value } });
+                    if (callback) callback({ message: error.message, data: { key, value } });
                 }
             }
         });
