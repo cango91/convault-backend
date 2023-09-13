@@ -33,7 +33,7 @@ Upon signing up, a private/public key pair will be created. You'll be prompted t
 + Socket.io
 
 ## Roadmap
-[Link to Trello]
+[Link to Trello](https://trello.com/b/zaAZv1KH/convault)
 
 ## Screenshots
 ![friend request](https://i.imgur.com/hrpHbqmm.png)
