@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const chatService = require('../../../utilities/chat-service');
 const cryptoService = require('../../../utilities/crypto-service');
 
 const chatSession = new mongoose.Schema({
@@ -30,7 +29,17 @@ chatSession.pre('save', function (next) {
         this._isModified = true;
     }
     next();
-})
+});
+
+const deleteThread = async (session) => {
+    const Message = mongoose.model('Message');
+    await Message.deleteMany({
+        $or: [
+            { senderId: session.user1, recipientId: session.user2 },
+            { senderId: session.user2, recipientId: session.user1 }
+        ]
+    });
+}
 
 chatSession.post('save', async function (doc, next) {
     if (!doc._isModified) {
@@ -38,7 +47,7 @@ chatSession.post('save', async function (doc, next) {
     }
     if (doc.user1Status === 'deleted' && doc.user2Status === 'deleted') {
         try {
-            await chatService.deleteThread(doc);
+            await deleteThread(doc);
             await doc.deleteOne();
         } catch (error) {
             console.error(error);
@@ -52,21 +61,23 @@ chatSession.pre('save', async function (next) {
     if (this.isModified('head') || this.isNew) {
         this.head = cryptoService.encrypt(this.head);
     }
-    if (this.isModified('user1Tail')){
+    if (this.user1Tail && this.isModified('user1Tail')) {
         this.user1Tail = cryptoService.encrypt(this.user1Tail);
     }
-    if (this.isModified('user2Tail')){
-        this.user1Tail = cryptoService.encrypt(this.user2Tail);
+    if (this.user2Tail && this.isModified('user2Tail')) {
+        this.user2Tail = cryptoService.encrypt(this.user2Tail);
     }
     next();
 });
 
-chatSession.post('findOne', (doc)=>{
-    if(doc.user1Tail){
-        doc.user1Tail = cryptoService.decrypt(doc.user1Tail);
-    }
-    if(doc.user2Tail){
-        doc.user2Tail = cryptoService.decrypt(doc.user2Tail);
+chatSession.post('findOne', (doc) => {
+    if (doc) {
+        if (doc.user1Tail) {
+            doc.user1Tail = cryptoService.decrypt(doc.user1Tail);
+        }
+        if (doc.user2Tail) {
+            doc.user2Tail = cryptoService.decrypt(doc.user2Tail);
+        }
     }
 })
 
