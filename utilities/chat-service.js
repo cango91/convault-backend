@@ -58,8 +58,8 @@ const calculateUnreadCount = async (session, userId) => {
         if (!msg.recipientId.equals(userId)) {
             break;
         }
-        if (msg.status !== 'read') unreadCount++;
-        else break;
+        if (msg.status === 'read') break;
+        else unreadCount++;
         msg = msg.previous ? await Message.findById(msg.previous) : null;
     }
     return unreadCount;
@@ -82,7 +82,7 @@ const getUserSessions = async (userId) => {
             session.unreadCount = unread;
             session.lastMessageDate = lastDate;
             ret.push(session);
-            
+
         }
         return ret;
     } catch (error) {
@@ -151,23 +151,23 @@ const sendMessage = async (recipientId, senderId, content) => {
 const getMessagesFrom = async (userId, fromId, session, count = 50) => {
     try {
         const first = await Message.findById(fromId);
-        if(!first) throw new Error('Message not found');
-        if(!first.recipientId.equals(userId) && !first.senderId.equals(userId)) throw new Error('Invalid message');
+        if (!first) throw new Error('Message not found');
+        if (!first.recipientId.equals(userId) && !first.senderId.equals(userId)) throw new Error('Invalid message');
         const sess = await ChatSession.findById(session);
-        if(!sess) throw new Error('Invalid session');
+        if (!sess) throw new Error('Invalid session');
         const ret = [first];
         let idx = 1;
         let msg = first;
-        while(first && idx<count){
+        while (first && idx < count) {
             msg = await Message.findById(msg.previous);
-            if(msg){
-                if((msg.senderId.equals(userId) && msg.isDeletedSender)
-                ||(msg.recipientId.equals(userId)&& msg.isDeletedRecipient)){
+            if (msg) {
+                if ((msg.senderId.equals(userId) && msg.isDeletedSender)
+                    || (msg.recipientId.equals(userId) && msg.isDeletedRecipient)) {
                     msg.encryptedContent = "";
                 }
                 ret.push(msg);
                 idx++;
-            }else{
+            } else {
                 break;
             }
         }
@@ -178,7 +178,7 @@ const getMessagesFrom = async (userId, fromId, session, count = 50) => {
     }
 }
 
-const sendEncrypted =  async (senderId,recipientId,content,key) =>{
+const sendEncrypted = async (senderId, recipientId, content, key) => {
     return await lock.acquire(generatePairKey(recipientId, senderId), async () => {
         try {
             let message = await createMessage(recipientId, senderId, content);
@@ -208,21 +208,35 @@ const sendEncrypted =  async (senderId,recipientId,content,key) =>{
     });
 }
 
-const deleteMessage = async (userId, messageId, both = false) =>{
+const deleteMessage = async (userId, messageId, both = false) => {
     try {
         const message = await Message.findById(messageId);
-        if(!message || (!message.senderId.equals(userId) && !message.recipientId.equals(userId))) throw new Error('Invalid message');
+        if (!message || (!message.senderId.equals(userId) && !message.recipientId.equals(userId))) throw new Error('Invalid message');
         const deletedBy = message.senderId.equals(userId) ? 'Sender' : 'Recipient';
-        if(both && deletedBy === 'Recipient') throw new Error('Not allowed');
-        if(!both){
+        if (both && deletedBy === 'Recipient') throw new Error('Not allowed');
+        if (!both) {
             message[`isDeleted${deletedBy}`] = true;
-        }else{
+        } else {
             message.isDeletedRecipient = true;
             message.isDeletedSender = true;
             message.status = 'deleted';
         }
         await message.save();
-        return message[`${deletedBy==='Sender' ? 'recipient' : 'sender'}Id`]._id;
+        return message[`${deletedBy === 'Sender' ? 'recipient' : 'sender'}Id`]._id;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
+const readMessages = async (userId, senderId) => {
+    try {
+        await Message.updateMany({
+            recipientId: userId,
+            senderId,
+            status: { $nin: ['read', 'deleted'] }
+        },
+            { status: 'read' });
     } catch (error) {
         console.error(error);
         throw error;
@@ -238,4 +252,5 @@ module.exports = {
     sendEncrypted,
     getMessagesFrom,
     deleteMessage,
+    readMessages,
 }

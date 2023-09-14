@@ -161,6 +161,7 @@ module.exports = (app) => {
         // send an encrypted message. If the sender sends a key to store, store in KeyStore
         socket.on('send-encrypted', async ({ recipient, encryptedContent, symmetricKey, storedKey }) => {
             try {
+                if(!authenticated) throw new Error('Not authorized');
                 if (!encryptedContent.replace(/\s+/g, '') || !recipient || !symmetricKey) throw new Error('Missing required data.');
                 if (typeof (recipient) !== 'string' || typeof (encryptedContent) !== 'string' || typeof (symmetricKey) !== 'string')
                     throw new TypeError();
@@ -195,6 +196,7 @@ module.exports = (app) => {
 
         socket.on('delete-message', async ({ id, both = false }) => {
             try {
+                if(!authenticated) throw new Error('Unauthorized')
                 const other = await chatService.deleteMessage(userId, id, both);
                 emitSynced('message-deleted', { id, other });
                 if (both) {
@@ -209,11 +211,22 @@ module.exports = (app) => {
         socket.on('get-messages', async ({ from, session, count }) => {
             count = Math.min(Math.abs(count || 50));
             try {
+                if(!authenticated) throw new Error('Unauthorized')
                 const messages = await chatService.getMessagesFrom(userId, from, session, count);
                 emitSynced('messages-retrieved', { messages, session, from });
             } catch (error) {
                 console.error(error);
                 socket.emit('get-messages-error', { message: error.message, data: { from, session, count } });
+            }
+        });
+
+        socket.on('read-messages',async ({senderId})=>{
+            try {
+                if(!authenticated) throw new Error('Unauthorized');
+                await chatService.readMessages(userId,senderId);
+            } catch (error) {
+                console.error(error);
+                socket.emit('get-messages-error', { message: error.message, data: { senderId } });
             }
         });
 

@@ -89,6 +89,8 @@ messageSchema.pre("save", function (next) {
     if (this.isNew) {
         this.createdAt = cryptoService.encrypt((new Date()).toString());
     } else if (this.isModified('createdAt')) {
+        /* When a message object is modified and saved, the above check will miss, and
+           save the createdAt value unencrypted. This check ensures that doesn't happen. */
         this.createdAt = cryptoService.encrypt(this.createdAt.toString());
     }
     this.updatedAt = cryptoService.encrypt((new Date()).toString());
