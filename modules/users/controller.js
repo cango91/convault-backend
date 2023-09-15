@@ -1,10 +1,13 @@
 const User = require('./models/user');
 const tokenService = require('../../utilities/token-service');
 const utils = require('../../utilities/utils');
+const SlidingWindowRateLimiter = require('../../utilities/sliding-window-rate-limiter');
 
+const loginRegisterLimiter = new SlidingWindowRateLimiter(10);
 /** Create new User */
 const create = async (req, res, next) => {
     try {
+        if(loginRegisterLimiter.isRateLimited(req.ip)) throw new Error("Too many requests");
         const user = new User(req.body);
         await user.save();
         const accessToken = tokenService.createJwt(user, process.env.JWT_EXP);
@@ -13,18 +16,20 @@ const create = async (req, res, next) => {
         res.json({ accessToken });
     } catch (error) {
         console.error(error);
-        utils.respondWithStatus(res);
+        if(/Path `password`/.test(error.message)) return utils.respondWithStatus(res,400,"Password too short");
+        utils.respondWithStatus(res,400,error.message);
     }
 }
 
 /** Log existing User in */
 const login = async (req, res, next) => {
     try {
+        if(loginRegisterLimiter.isRateLimited(req.ip)) throw new Error("Too many requests");
         const { username, password } = req.body;
         //if(!username || !password) throw new Error('Bad Credentials');
         const user = await User.findOne({ username });
         if (!user || !(await user.verifyPassword(password))) {
-            return utils.respondWithStatus(res, 401, 'Bad Credentials');
+            return utils.respondWithStatus(res, 401, 'Invalid Credentials');
         }
         const accessToken = tokenService.createJwt(user, process.env.JWT_EXP);
         const refreshToken = await tokenService.createRefreshToken(user, process.env.REFRESH_EXP);
@@ -32,7 +37,7 @@ const login = async (req, res, next) => {
         res.json({ accessToken });
     } catch (error) {
         console.error(error);
-        utils.respondWithStatus(res);
+        utils.respondWithStatus(res,400,error.message);
     }
 }
 
